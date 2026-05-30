@@ -1,0 +1,50 @@
+# ArxisOS — enforce LF on everything that runs or is parsed on Linux.
+# CRLF in a shell script makes the shebang `#!/bin/bash\r`, which the Linux
+# kernel rejects with "exec format error". This file prevents that regressing
+# regardless of the OS the repo is edited on.
+
+# Default: treat as text, normalize to LF in the repo.
+* text=auto eol=lf
+
+# Explicit LF for executable / parsed text.
+*.sh        text eol=lf
+*.ks        text eol=lf
+*.bash      text eol=lf
+*.script    text eol=lf
+*.conf      text eol=lf
+*.theme     text eol=lf
+*.desktop   text eol=lf
+*.colors    text eol=lf
+*.colorscheme text eol=lf
+*.profile   text eol=lf
+*.ini       text eol=lf
+*.js        text eol=lf
+*.qml       text eol=lf
+*.json      text eol=lf
+*.toml      text eol=lf
+*.txt       text eol=lf
+*.md        text eol=lf
+*.svg       text eol=lf
+hfetch      text eol=lf
+.bashrc     text eol=lf
+.bash_aliases text eol=lf
+
+# Binary assets — never touch line endings.
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.pf2       binary
+*.ttf       binary
+*.otf       binary
+*.woff      binary
+*.woff2     binary
+*.iso       binary
+*.img       binary
+*.squashfs  binary
+*.gz        binary
+*.xz        binary
+*.zst       binary
+*.cur       binary
+*.ani       binary

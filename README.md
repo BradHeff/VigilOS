@@ -28,9 +28,11 @@
 
 ## Overview
 
-**ArxisOS** is a beautifully crafted Linux distribution based on Fedora 43, featuring the KDE Plasma 6 desktop environment. Designed with a focus on aesthetics, performance, and user experience, ArxisOS combines the stability and security of Fedora with a stunning custom visual identity.
+**ArxisOS 1.0 "Loopback"** is a Linux distribution based on Fedora 43, featuring the KDE Plasma 6 desktop environment. Built for IT engineers and power users, it pairs the stability and security of Fedora with a cohesive custom visual identity and a sensible default toolset.
 
-Whether you're a developer, creative professional, or everyday user, ArxisOS provides a polished, cohesive experience right out of the box.
+Whether you're a sysadmin, network engineer, developer, or power user, ArxisOS provides a polished, cohesive experience right out of the box.
+
+> **Release codename:** `Loopback` (`VERSION_CODENAME=loopback`). The first stable release is **ArxisOS 1.0 "Loopback"**.
 
 ---
 
@@ -51,11 +53,11 @@ Whether you're a developer, creative professional, or everyday user, ArxisOS pro
 ### System Features
 
 - **Fedora 43 Base** — Latest packages, cutting-edge kernel, and excellent hardware support
-- **SELinux Enabled** — Enterprise-grade security out of the box
+- **SELinux** — Ships in *permissive* mode for a smooth first boot; switch to enforcing with `sudo setenforce 1` and set `SELINUX=enforcing` in `/etc/selinux/config` once the system is stable
 - **Flatpak Ready** — Access to thousands of applications via Flathub
 - **DNF Package Manager** — Fast, reliable package management
 - **Systemd** — Modern init system with excellent service management
-- **Btrfs Support** — Advanced filesystem with snapshots and compression
+- **ext4 by default** — Reliable default filesystem (choose Btrfs/LVM/XFS manually in the Anaconda installer if preferred)
 
 ### Pre-installed Applications
 
@@ -248,10 +250,17 @@ We are developing **ApM (Arxis Package Manager)** — a next-generation package 
 
 ### Prerequisites
 
-- Fedora 43 or compatible system
-- `osbuild-composer` for image building
-- Root/sudo access
-- ~50GB free disk space
+- Fedora 43 host (the branding step chroots into a Fedora rootfs)
+- Root/sudo access (loop devices, mount, chroot)
+- ~50 GB free disk space
+- Packages:
+  ```bash
+  sudo dnf install -y osbuild-composer composer-cli weldr-client \
+    squashfs-tools xorriso rsync xz cpio ImageMagick \
+    grub2-tools grub2-tools-extra dosfstools pykickstart
+  ```
+- **Line endings:** all scripts are LF-only (enforced by `.gitattributes`). If you edit on Windows, keep them LF — a CRLF shebang (`#!/bin/bash\r`) fails with "exec format error" on Linux.
+- Sanity-check the tree before building: `./scripts/validate.sh`
 
 ### Build Process
 

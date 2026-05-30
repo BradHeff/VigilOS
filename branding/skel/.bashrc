@@ -61,7 +61,9 @@ if ! [[ "$XDG_DATA_DIRS" =~ "/var/lib/snapd/desktop/" ]]; then
 fi
 export PATH
 export XDG_DATA_DIRS
-export QT_QPA_PLATFORMTHEME=qt5ct
+# Qt theming: KDE Plasma 6 (Qt6) sets the platform theme itself. Forcing qt5ct
+# (not installed) breaks Qt6 application styling, so leave it unset.
+# export QT_QPA_PLATFORMTHEME=qt5ct
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion

@@ -24,7 +24,7 @@ name=PurPurDay-Plasma
 
 [kwinrc][org.kde.kdecoration2]
 library=org.kde.kwin.aurorae
-theme=__aurorae__svg__PurPurDay-Aurorae-6
+theme=__aurorae__svg__PurPurDayBlur-Aurorae-6
 
 [KSplash]
 Theme=PurPurDay-Splash-6

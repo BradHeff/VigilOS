@@ -1547,17 +1547,23 @@ fi
 echo ""
 echo "=== Applying OS Branding ==="
 
-sudo tee "$ROOTFS_DIR/etc/os-release" > /dev/null << 'EOF'
+# Canonical os-release lives in /usr/lib (shipped by fedora-release). We MUST
+# overwrite it there, not just /etc, or systemd tooling that reads the canonical
+# /usr/lib/os-release will still report "Fedora". /etc/os-release then points to it.
+sudo mkdir -p "$ROOTFS_DIR/usr/lib"
+sudo tee "$ROOTFS_DIR/usr/lib/os-release" > /dev/null << 'EOF'
 NAME="ArxisOS"
-VERSION="1.0 (Plasma)"
+VERSION="1.0 (Loopback)"
 ID=arxisos
 ID_LIKE=fedora
 VERSION_ID=1.0
-VERSION_CODENAME=Plasma
-PRETTY_NAME="ArxisOS 1.0 (Plasma)"
+VERSION_CODENAME=loopback
+PRETTY_NAME="ArxisOS 1.0 (Loopback)"
 ANSI_COLOR="0;38;2;129;212;250"
 LOGO=arxisos-logo
 CPE_NAME="cpe:/o:arxisos:arxisos:1"
+VARIANT="KDE Plasma"
+VARIANT_ID=kde
 HOME_URL="https://arxisos.com"
 DOCUMENTATION_URL="https://docs.arxisos.com"
 SUPPORT_URL="https://support.arxisos.com"
@@ -1565,15 +1571,21 @@ BUG_REPORT_URL="https://github.com/arxisos/arxisos/issues"
 PRIVACY_POLICY_URL="https://arxisos.com/privacy"
 DEVELOPER="Brad Heffernan"
 EOF
+# /etc/os-release is conventionally a relative symlink to the canonical file.
+sudo ln -sf ../usr/lib/os-release "$ROOTFS_DIR/etc/os-release"
 
-echo "ArxisOS release 1.0 (Plasma)" | sudo tee "$ROOTFS_DIR/etc/system-release" > /dev/null
-echo "ArxisOS release 1.0 (Plasma)" | sudo tee "$ROOTFS_DIR/etc/arxisos-release" > /dev/null
+echo "ArxisOS release 1.0 (Loopback)" | sudo tee "$ROOTFS_DIR/etc/system-release" > /dev/null
+echo "ArxisOS release 1.0 (Loopback)" | sudo tee "$ROOTFS_DIR/etc/arxisos-release" > /dev/null
+
+# Console login banners (otherwise inherited from fedora-release / setup pkgs).
+printf 'ArxisOS 1.0 (Loopback) \\r (\\l)\n\n' | sudo tee "$ROOTFS_DIR/etc/issue" > /dev/null
+printf 'ArxisOS 1.0 (Loopback)\n' | sudo tee "$ROOTFS_DIR/etc/issue.net" > /dev/null
 
 sudo tee "$ROOTFS_DIR/etc/lsb-release" > /dev/null << 'EOF'
 DISTRIB_ID=ArxisOS
 DISTRIB_RELEASE=1.0
-DISTRIB_CODENAME=Plasma
-DISTRIB_DESCRIPTION="ArxisOS 1.0 (Plasma)"
+DISTRIB_CODENAME=loopback
+DISTRIB_DESCRIPTION="ArxisOS 1.0 (Loopback)"
 DISTRIB_DEVELOPER="Brad Heffernan"
 EOF
 
@@ -1710,6 +1722,18 @@ else
         -no-emul-boot \
         -isohybrid-gpt-basdat \
         "$WORK_DIR/new_iso"
+fi
+
+# Re-implant the ISO MD5 checksum. xorrisofs produces a fresh image without the
+# checksum that the original osbuild ISO carried, so the GRUB "Test this media"
+# entry (rd.live.check / checkisomd5) reports "NA" and halts. Implanting it makes
+# media verification pass; the normal boot entry works either way.
+if command -v implantisomd5 >/dev/null 2>&1; then
+    echo "  - Implanting ISO MD5 checksum (for media check)..."
+    sudo implantisomd5 --force "$output_iso" || \
+        echo "  WARNING: implantisomd5 failed; 'Test this media' will report NA (normal boot unaffected)." >&2
+else
+    echo "  WARNING: implantisomd5 not found (install isomd5sum); skipping media checksum." >&2
 fi
 
 echo ""

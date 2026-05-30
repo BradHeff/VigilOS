@@ -99,5 +99,5 @@ plugin=org.kde.plasma.folder
 wallpaperplugin=org.kde.image
 
 [Containments][1][Wallpaper][org.kde.image][General]
-Image=/usr/share/wallpapers/arxisos/default.jpg
-PreviewImage=/usr/share/wallpapers/arxisos/default.jpg
+Image=/usr/share/wallpapers/ArxisOS/contents/images/3840x2160.png
+PreviewImage=/usr/share/wallpapers/ArxisOS/contents/images/3840x2160.png

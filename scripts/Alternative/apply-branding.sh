@@ -1220,17 +1220,22 @@ fi
 
 # Apply OS branding
 echo "  - OS release info"
-sudo tee "$ROOTFS_DIR/etc/os-release" > /dev/null << 'EOF'
+# Canonical os-release lives in /usr/lib (shipped by fedora-release); overwrite
+# it there or tooling still reports "Fedora". /etc/os-release symlinks to it.
+sudo mkdir -p "$ROOTFS_DIR/usr/lib"
+sudo tee "$ROOTFS_DIR/usr/lib/os-release" > /dev/null << 'EOF'
 NAME="ArxisOS"
-VERSION="1.0 (Plasma)"
+VERSION="1.0 (Loopback)"
 ID=arxisos
 ID_LIKE=fedora
 VERSION_ID=1.0
-VERSION_CODENAME=Plasma
-PRETTY_NAME="ArxisOS 1.0 (Plasma)"
+VERSION_CODENAME=loopback
+PRETTY_NAME="ArxisOS 1.0 (Loopback)"
 ANSI_COLOR="0;38;2;129;212;250"
 LOGO=arxisos-logo
 CPE_NAME="cpe:/o:arxisos:arxisos:1"
+VARIANT="KDE Plasma"
+VARIANT_ID=kde
 HOME_URL="https://arxisos.com"
 DOCUMENTATION_URL="https://docs.arxisos.com"
 SUPPORT_URL="https://support.arxisos.com"
@@ -1238,16 +1243,21 @@ BUG_REPORT_URL="https://github.com/arxisos/arxisos/issues"
 PRIVACY_POLICY_URL="https://arxisos.com/privacy"
 DEVELOPER="Brad Heffernan"
 EOF
+sudo ln -sf ../usr/lib/os-release "$ROOTFS_DIR/etc/os-release"
 
-echo "ArxisOS release 1.0 (Plasma)" | sudo tee "$ROOTFS_DIR/etc/system-release" > /dev/null
-echo "ArxisOS release 1.0 (Plasma)" | sudo tee "$ROOTFS_DIR/etc/arxisos-release" > /dev/null
+echo "ArxisOS release 1.0 (Loopback)" | sudo tee "$ROOTFS_DIR/etc/system-release" > /dev/null
+echo "ArxisOS release 1.0 (Loopback)" | sudo tee "$ROOTFS_DIR/etc/arxisos-release" > /dev/null
+
+# Console login banners
+printf 'ArxisOS 1.0 (Loopback) \\r (\\l)\n\n' | sudo tee "$ROOTFS_DIR/etc/issue" > /dev/null
+printf 'ArxisOS 1.0 (Loopback)\n' | sudo tee "$ROOTFS_DIR/etc/issue.net" > /dev/null
 
 # Create lsb-release
 sudo tee "$ROOTFS_DIR/etc/lsb-release" > /dev/null << 'EOF'
 DISTRIB_ID=ArxisOS
 DISTRIB_RELEASE=1.0
-DISTRIB_CODENAME=Plasma
-DISTRIB_DESCRIPTION="ArxisOS 1.0 (Plasma)"
+DISTRIB_CODENAME=loopback
+DISTRIB_DESCRIPTION="ArxisOS 1.0 (Loopback)"
 DISTRIB_DEVELOPER="Brad Heffernan"
 EOF
 

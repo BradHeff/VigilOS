@@ -120,31 +120,40 @@ plymouth-plugin-script
 # ----------------------
 # OS Release Branding
 # ----------------------
-cat > /etc/os-release << 'EOF'
+# Write canonical /usr/lib/os-release (fedora-release ships it there) so no tool
+# reports "Fedora"; /etc/os-release becomes a symlink to it.
+cat > /usr/lib/os-release << 'EOF'
 NAME="ArxisOS"
-VERSION="1.0 (Plasma)"
+VERSION="1.0 (Loopback)"
 ID=arxisos
 ID_LIKE=fedora
 VERSION_ID=1.0
-VERSION_CODENAME=Plasma
-PRETTY_NAME="ArxisOS 1.0 (Plasma)"
+VERSION_CODENAME=loopback
+PRETTY_NAME="ArxisOS 1.0 (Loopback)"
 ANSI_COLOR="0;38;2;129;212;250"
 LOGO=arxisos-logo
 CPE_NAME="cpe:/o:arxisos:arxisos:1"
+VARIANT="KDE Plasma"
+VARIANT_ID=kde
 HOME_URL="https://arxisos.com"
 DOCUMENTATION_URL="https://docs.arxisos.com"
 SUPPORT_URL="https://support.arxisos.com"
 BUG_REPORT_URL="https://github.com/arxisos/arxisos/issues"
 PRIVACY_POLICY_URL="https://arxisos.com/privacy"
 EOF
+ln -sf ../usr/lib/os-release /etc/os-release
 
 cat > /etc/system-release << 'EOF'
-ArxisOS release 1.0 (Plasma)
+ArxisOS release 1.0 (Loopback)
 EOF
 
 cat > /etc/arxisos-release << 'EOF'
-ArxisOS release 1.0 (Plasma)
+ArxisOS release 1.0 (Loopback)
 EOF
+
+# Console login banners (otherwise inherited from fedora-release / setup).
+printf 'ArxisOS 1.0 (Loopback) \\r (\\l)\n\n' > /etc/issue
+printf 'ArxisOS 1.0 (Loopback)\n' > /etc/issue.net
 
 # ----------------------
 # Flatpak Setup - Repo only (installs at first boot)
@@ -206,10 +215,11 @@ systemctl enable arxisos-first-boot.service
 # ----------------------
 mkdir -p /etc/skel/.config
 
-# Default wallpaper
+# Default wallpaper (canonical KDE package path)
 cat > /etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc << 'EOF'
 [Containments][1][Wallpaper][org.kde.image][General]
-Image=/usr/share/wallpapers/arxisos/default.png
+Image=/usr/share/wallpapers/ArxisOS/contents/images/3840x2160.png
+PreviewImage=/usr/share/wallpapers/ArxisOS/contents/images/3840x2160.png
 EOF
 
 # ----------------------
@@ -321,10 +331,12 @@ if [ -d "$BRANDING_SRC/sddm/arxisos" ]; then
     cp -r "$BRANDING_SRC/sddm/arxisos" $INSTALL_ROOT/usr/share/sddm/themes/
 fi
 
-# Copy Wallpapers
-if [ -d "$BRANDING_SRC/wallpapers" ]; then
-    mkdir -p $INSTALL_ROOT/usr/share/wallpapers/arxisos
-    cp -r "$BRANDING_SRC/wallpapers"/* $INSTALL_ROOT/usr/share/wallpapers/arxisos/
+# Copy Wallpapers (canonical KDE package dir is ArxisOS; keep lowercase symlink)
+if [ -d "$BRANDING_SRC/wallpapers/ArxisOS" ]; then
+    mkdir -p $INSTALL_ROOT/usr/share/wallpapers/ArxisOS
+    cp -r "$BRANDING_SRC/wallpapers/ArxisOS"/* $INSTALL_ROOT/usr/share/wallpapers/ArxisOS/
+    cp "$BRANDING_SRC/wallpapers/default.png" $INSTALL_ROOT/usr/share/wallpapers/ArxisOS.png 2>/dev/null || true
+    ln -sf ArxisOS $INSTALL_ROOT/usr/share/wallpapers/arxisos 2>/dev/null || true
 fi
 
 # Copy Logos
