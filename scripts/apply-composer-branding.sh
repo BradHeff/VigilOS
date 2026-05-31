@@ -1732,6 +1732,34 @@ DISTRIB_DESCRIPTION="ArxisOS 1.2 (Loopback)"
 DISTRIB_DEVELOPER="Brad Heffernan"
 EOF
 
+# ============================================
+# ANACONDA INSTALLER PROFILE  (bootloader-install fix)
+# ============================================
+# Fedora 43's Anaconda picks its profile (/etc/anaconda/profile.d/*.conf) by
+# matching the live env's os-release ID/VARIANT_ID. Because we rebrand ID=arxisos
+# above, NO stock profile matches, so Anaconda falls back to built-in defaults
+# where [Bootloader] efi_dir = "default". At the bootloader step it then runs
+#   gen_grub_cfgstub /boot/grub2 /boot/efi/EFI/default
+# but shim/grub2-efi installed to /boot/efi/EFI/fedora, so EFI/default does not
+# exist and the script fails ->
+#   org.fedoraproject.Anaconda.BootloaderInstallationError: gen_grub_cfgstub script failed
+# (the exact install crash we hit on the RTX 4080 box, 2026-05-31).
+#
+# Ship an arxisos profile that inherits the fedora profile. Inheritance pulls in
+# efi_dir=fedora (and Fedora's storage/bootloader defaults), and [Profile Detection]
+# os_id=arxisos makes Anaconda auto-select it from our rebranded os-release.
+sudo mkdir -p "$ROOTFS_DIR/etc/anaconda/profile.d"
+sudo tee "$ROOTFS_DIR/etc/anaconda/profile.d/arxisos.conf" > /dev/null << 'EOF'
+# ArxisOS Anaconda profile — inherits Fedora so the installed system's GRUB
+# lands in /boot/efi/EFI/fedora (matching the shim/grub2-efi packages).
+[Profile]
+profile_id = arxisos
+base_profile = fedora
+
+[Profile Detection]
+os_id = arxisos
+EOF
+
 # Set dnf releasever for Fedora 43 repos
 sudo mkdir -p "$ROOTFS_DIR/etc/dnf/vars"
 echo "43" | sudo tee "$ROOTFS_DIR/etc/dnf/vars/releasever" > /dev/null

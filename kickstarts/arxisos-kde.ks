@@ -159,6 +159,24 @@ printf 'ArxisOS 1.2 (Loopback) \\r (\\l)\n\n' > /etc/issue
 printf 'ArxisOS 1.2 (Loopback)\n' > /etc/issue.net
 
 # ----------------------
+# Anaconda installer profile (bootloader-install fix)
+# ----------------------
+# Rebranding ID=arxisos stops Anaconda from matching a stock profile in
+# /etc/anaconda/profile.d/, so it falls back to efi_dir="default" and the
+# bootloader step's gen_grub_cfgstub fails (it writes to /boot/efi/EFI/default,
+# but shim/grub2-efi install to EFI/fedora). Ship an arxisos profile that
+# inherits the fedora profile -> efi_dir=fedora and GRUB installs cleanly.
+mkdir -p /etc/anaconda/profile.d
+cat > /etc/anaconda/profile.d/arxisos.conf << 'EOF'
+[Profile]
+profile_id = arxisos
+base_profile = fedora
+
+[Profile Detection]
+os_id = arxisos
+EOF
+
+# ----------------------
 # Flatpak Setup - Repo only (installs at first boot)
 # ----------------------
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo

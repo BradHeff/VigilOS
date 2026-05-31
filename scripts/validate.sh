@@ -79,6 +79,23 @@ else
   bad "codename not set to loopback"
 fi
 
+# 5b. Anaconda profile present (gen_grub_cfgstub bootloader-install fix) -------
+# Rebranding ID=arxisos makes Anaconda fall back to efi_dir="default" unless an
+# arxisos profile (inheriting fedora) ships in the live env. Without it the
+# install dies with "gen_grub_cfgstub script failed". Guard all 3 build paths.
+echo "-- anaconda installer profile --"
+prof_ok=1
+for f in scripts/apply-composer-branding.sh scripts/Alternative/apply-branding.sh \
+         kickstarts/arxisos-kde.ks; do
+  if grep -q 'anaconda/profile.d/arxisos.conf' "$f" 2>/dev/null \
+     && grep -q 'base_profile = fedora' "$f" 2>/dev/null \
+     && grep -q 'os_id = arxisos' "$f" 2>/dev/null; then
+    ok "anaconda profile fix present in $f"
+  else
+    bad "anaconda profile fix MISSING in $f (bootloader install will fail)"; prof_ok=0
+  fi
+done
+
 # 6. Aurorae decoration name matches the installed theme ----------------------
 echo "-- theming references --"
 if grep -RIl 'PurPurDay-Aurorae-6' Skel branding/plasma-themes >/dev/null 2>&1; then

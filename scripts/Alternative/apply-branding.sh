@@ -1261,6 +1261,20 @@ DISTRIB_DESCRIPTION="ArxisOS 1.2 (Loopback)"
 DISTRIB_DEVELOPER="Brad Heffernan"
 EOF
 
+# Anaconda installer profile (bootloader-install fix). Rebranding ID=arxisos
+# stops Anaconda matching a stock profile, so it falls back to efi_dir="default"
+# and gen_grub_cfgstub fails (EFI/default missing; shim is in EFI/fedora). Ship an
+# arxisos profile inheriting fedora so efi_dir=fedora and the GRUB stub installs.
+sudo mkdir -p "$ROOTFS_DIR/etc/anaconda/profile.d"
+sudo tee "$ROOTFS_DIR/etc/anaconda/profile.d/arxisos.conf" > /dev/null << 'EOF'
+[Profile]
+profile_id = arxisos
+base_profile = fedora
+
+[Profile Detection]
+os_id = arxisos
+EOF
+
 # Create first-boot service to finalize GRUB, Plymouth, and system configuration
 echo "  - Creating first-boot setup service"
 sudo tee "$ROOTFS_DIR/etc/systemd/system/arxisos-first-boot.service" > /dev/null << 'FIRSTBOOT_EOF'

@@ -73,6 +73,11 @@ kreadconfig6 --file kwinrc --group org.kde.kdecoration2 --key theme
    `Alternative/apply-branding.sh`, `kickstarts/arxisos-kde.ks`. All write
    **`/usr/lib/os-release`** (canonical) and symlink `/etc/os-release` → it. Never write only
    `/etc/os-release` (Fedora identity leaks via the canonical file otherwise).
+   **Rebranding `ID=arxisos` REQUIRES shipping `/etc/anaconda/profile.d/arxisos.conf`**
+   (`base_profile = fedora`, `os_id = arxisos`) in the live env, or Anaconda can't match a
+   profile, falls back to `efi_dir="default"`, and the install dies at the bootloader step
+   with `gen_grub_cfgstub script failed`. All 3 identity paths now write this file too — keep
+   them in sync. `validate.sh` guards it.
 3. **Run `./scripts/validate.sh` before every build.**
 4. **GPU boot params are load-bearing.** All live + installed kernel cmdlines carry
    `rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0` so the
@@ -140,10 +145,39 @@ to **1.2** (codename unchanged). Details in `REPAIRS.md` (2026-05-31 section).
   `ArxisOS-1.2-x86_64.iso` built, branded, and written to the USB stick. `sudo` needs a
   password here, so this step is interactive-only (see "Build environment reality").
 
+## Session progress (2026-05-31, later) — installer bootloader-step fix
+
+Live ISO booted fine on the RTX 4080 box (GPU fix from earlier worked) and Anaconda ran;
+**install failed at "Installing boot loader"** with
+`org.fedoraproject.Anaconda.BootloaderInstallationError: gen_grub_cfgstub script failed`.
+
+- **Root cause:** F43 Anaconda selects its profile (`/etc/anaconda/profile.d/*.conf`) by the
+  live env's os-release `ID`/`VARIANT_ID`. Our rebrand to `ID=arxisos` matched no stock
+  profile, so Anaconda used built-in defaults where `[Bootloader] efi_dir = "default"`. The
+  bootloader step ran `gen_grub_cfgstub /boot/grub2 /boot/efi/EFI/default`, but shim/grub2-efi
+  install to `/boot/efi/EFI/fedora`, so `EFI/default` didn't exist → script returns non-zero.
+- **Repo fix (all 3 paths + validate.sh):** ship `/etc/anaconda/profile.d/arxisos.conf` with
+  `base_profile = fedora` (inherits `efi_dir=fedora` + Fedora storage/bootloader defaults) and
+  `[Profile Detection] os_id = arxisos` (auto-selected from our os-release). See rule #2.
+- **Current USB (no rebuild needed):** at the GRUB menu press `e` and add **`inst.profile=fedora`**
+  to the `linux`/`linuxefi` line, boot, then run the installer — bootloader installs cleanly.
+  (Alternatively, before launching the installer, drop the arxisos.conf into the live overlay
+  `/etc/anaconda/profile.d/` — the live `/etc` is a writable overlay.)
+- **Secondary (cosmetic):** early live boot prints
+  `29-parse-livenet.sh: line 6: get_url_handler: command not found` and pauses briefly before
+  the splash. The live root is `root=live:CDLABEL=…` (local), so livenet does nothing useful —
+  this is dracut's livenet parse hook referencing a `url-lib` function not in the initramfs.
+  Non-fatal (boot proceeds). Proper fix is a Fedora-host action: rebuild the live initramfs
+  including the `url-lib` dracut module (or drop `livenet`). Not blocking.
+
 ## Next step
 
-Boot the freshly-burned 1.2 USB on the RTX 4080 box and confirm it now reaches
-SDDM/desktop (was: black screen + cursor). In the live session, verify:
+Re-run the install from the **current USB** using `inst.profile=fedora` (above) to confirm the
+bootloader installs and the system boots from disk — no rebuild required. Then rebuild 1.2 with
+the repo fix so the profile ships in the image and the boot-option workaround is unnecessary.
+
+After that, boot the installed 1.2 system and confirm it reaches SDDM/desktop. In the live
+session you can still verify identity/GPU:
 
 ```bash
 cat /usr/lib/os-release            # PRETTY_NAME="ArxisOS 1.2 (Loopback)"

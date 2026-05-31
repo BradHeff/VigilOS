@@ -3,6 +3,64 @@
 Repairs applied to make ArxisOS produce a correctly-branded, bootable live ISO.
 Release set to **ArxisOS 1.2 "Loopback"** (`VERSION_CODENAME=loopback`).
 
+## 2026-05-31 (later) — installer bootloader step: `gen_grub_cfgstub script failed`
+
+**Symptom (real hardware: i7-13700K + RTX 4080).** With the GPU fix in place the live
+ISO booted and Anaconda ran. Storage config and software install completed; the install
+then died during *System configuration → Installing boot loader* with:
+
+```
+org.fedoraproject.Anaconda.BootloaderInstallationError: gen_grub_cfgstub script failed
+```
+
+**Root cause.** Fedora 43's Anaconda selects its installer **profile**
+(`/etc/anaconda/profile.d/*.conf`) by matching the *live environment's* os-release
+`ID`/`VARIANT_ID` (or an `inst.profile=` boot arg). Our branding rewrites the live
+os-release to `ID=arxisos`, which matches **no** stock profile, so Anaconda falls back to
+built-in defaults — where `[Bootloader] efi_dir = "default"` (the Fedora profile would set
+it to `fedora`). At the bootloader step Anaconda runs:
+
+```
+gen_grub_cfgstub <config_dir> efi/EFI/<efi_dir>     # i.e. /boot/grub2  /boot/efi/EFI/default
+```
+
+but the `shim-x64` / `grub2-efi-x64` packages install the EFI binaries to
+`/boot/efi/EFI/**fedora**`. `EFI/default` does not exist, so the stub-generator returns
+non-zero and Anaconda raises `BootloaderInstallationError`. (Confirmed against anaconda
+`pyanaconda/modules/storage/bootloader/efi.py`: `_efi_config_dir → efi/EFI/{efi_dir}`,
+`efi_dir` from `conf.bootloader.efi_dir`, default `"default"`, Fedora profile `"fedora"`.)
+
+**Fix (repo, all 3 identity paths + a validate.sh guard).** Ship an ArxisOS Anaconda
+profile in the live env that inherits Fedora:
+
+```ini
+# /etc/anaconda/profile.d/arxisos.conf
+[Profile]
+profile_id = arxisos
+base_profile = fedora      # inherits efi_dir=fedora + Fedora storage/bootloader defaults
+
+[Profile Detection]
+os_id = arxisos            # matches our rebranded os-release -> auto-selected
+```
+
+Written by `apply-composer-branding.sh`, `Alternative/apply-branding.sh`, and
+`kickstarts/arxisos-kde.ks` (right after os-release). `validate.sh` now fails the build if
+any of the three is missing the profile.
+
+**Current USB — fix without rebuilding.** At the GRUB menu press `e`, append
+`inst.profile=fedora` to the `linux`/`linuxefi` line, boot, then run the installer; the
+bootloader installs cleanly. (Or, before launching the installer, create the arxisos.conf
+above under the live overlay `/etc/anaconda/profile.d/` — the live `/etc` is writable.) The
+installed system still gets full ArxisOS identity from the squashfs; the profile only steers
+the *installer's* behaviour.
+
+**Secondary (cosmetic, non-blocking).** Early live boot prints
+`…/29-parse-livenet.sh: line 6: get_url_handler: command not found` and pauses briefly
+before the Plymouth splash. The live root is `root=live:CDLABEL=…` (local media), so the
+`livenet` dracut hook has nothing to do — the message is that hook referencing a `url-lib`
+helper not present in the initramfs. Boot proceeds. Proper fix (Fedora-host): rebuild the
+live initramfs including the `url-lib` dracut module, or drop `livenet`. Left as a follow-up.
+
 ## 2026-05-31 — GPU boot fix + 1.2 bump
 
 **Symptom (real hardware: i7-13700K + NVIDIA RTX 4080).** GRUB/Plymouth splash
