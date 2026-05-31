@@ -11,10 +11,10 @@ BRANDING_DIR="$BUILD_DIR/branding"
 PLASMA_CFG_DIR="$BUILD_DIR/PLASMA-CONFIGS"
 SKEL_DIR="$BUILD_DIR/Skel"
 WORK_DIR="/var/tmp/arxisos-composer-branding"
-ISO_LABEL_DEFAULT="ArxisOS-1-0-x86_64"
+ISO_LABEL_DEFAULT="ArxisOS-1-2-x86_64"
 
 input_iso="${1:-}"
-output_iso="${2:-$BUILD_DIR/ArxisOS-1.0-x86_64.iso}"
+output_iso="${2:-$BUILD_DIR/ArxisOS-1.2-x86_64.iso}"
 # Derive an ISO label that matches the output filename unless overridden
 ISO_LABEL="${ISO_LABEL:-$(basename "${output_iso%.iso}")}"
 [[ -z "$ISO_LABEL" ]] && ISO_LABEL="$ISO_LABEL_DEFAULT"
@@ -563,6 +563,135 @@ sudo mkdir -p "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants"
 sudo ln -sf /etc/systemd/system/arxisos-first-boot.service "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants/arxisos-first-boot.service" 2>/dev/null || true
 
 # ============================================
+# GPU DRIVER SETUP (multi-vendor, installed system only)
+# ============================================
+# Goal: boot freely into the live environment on ANY GPU, and on an INSTALLED
+# system pull the right accelerated driver automatically.
+#
+#   * NVIDIA: nouveau cannot drive Ada Lovelace / RTX 40xx (and is shaky on
+#     several newer cards) -> live & pre-driver boots use the nouveau blacklist
+#     in the kernel cmdline (simpledrm framebuffer). On first boot of an
+#     installed system this service installs akmod-nvidia from RPM Fusion and
+#     builds the kmod, then notifies the user to reboot into the real driver.
+#   * AMD (amdgpu) / Intel (i915): in-kernel KMS already works out of the box,
+#     so nothing to install -- the blacklist does not touch them.
+#
+# This runs in its own network-gated, marker-guarded oneshot service so any
+# failure (no network, repo down) is isolated and never blocks the desktop.
+echo "  - Creating GPU driver setup service..."
+
+sudo tee "$ROOTFS_DIR/usr/local/bin/arxisos-gpu-setup.sh" > /dev/null << 'GPUSETUP_SCRIPT'
+#!/bin/bash
+# ArxisOS GPU setup - runs once on first boot of an INSTALLED system.
+LOG="/var/log/arxisos-gpu-setup.log"
+echo "$(date): ArxisOS GPU setup starting" >> "$LOG"
+
+# Never run in the live environment.
+if [ -d /run/initramfs/live ] || grep -q "rd.live" /proc/cmdline 2>/dev/null; then
+    echo "$(date): live environment - skipping GPU setup" >> "$LOG"
+    exit 0
+fi
+
+# Detect an NVIDIA display controller without depending on pciutils:
+# PCI vendor 0x10de + class VGA (0x0300xx) or 3D controller (0x0302xx).
+nvidia_present() {
+    local v cls dev
+    for v in /sys/bus/pci/devices/*/vendor; do
+        [ -r "$v" ] || continue
+        [ "$(cat "$v" 2>/dev/null)" = "0x10de" ] || continue
+        dev="$(dirname "$v")"
+        cls="$(cat "$dev/class" 2>/dev/null)"
+        case "$cls" in
+            0x0300*|0x0302*) return 0 ;;
+        esac
+    done
+    return 1
+}
+
+if ! nvidia_present; then
+    echo "$(date): no NVIDIA GPU detected (AMD/Intel use in-kernel KMS, nothing to do)" >> "$LOG"
+    exit 0
+fi
+
+echo "$(date): NVIDIA GPU detected - installing proprietary driver" >> "$LOG"
+
+# RPM Fusion (free + nonfree) provides akmod-nvidia.
+dnf install -y \
+    "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm" \
+    "https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm" \
+    >> "$LOG" 2>&1 || echo "$(date): WARNING rpmfusion install failed" >> "$LOG"
+
+if dnf install -y akmod-nvidia xorg-x11-drv-nvidia-cuda >> "$LOG" 2>&1; then
+    # Build the kmod now so the driver is ready on the next boot.
+    akmods --force >> "$LOG" 2>&1 || echo "$(date): akmods build returned non-zero" >> "$LOG"
+    # Flag for the per-user notifier (autostart) to prompt a reboot.
+    touch /var/lib/arxisos-nvidia-ready
+    echo "$(date): akmod-nvidia installed; reboot flag set" >> "$LOG"
+else
+    echo "$(date): WARNING akmod-nvidia install failed - staying on nouveau-blacklisted simpledrm" >> "$LOG"
+fi
+
+echo "$(date): GPU setup complete" >> "$LOG"
+GPUSETUP_SCRIPT
+sudo chmod +x "$ROOTFS_DIR/usr/local/bin/arxisos-gpu-setup.sh"
+
+sudo tee "$ROOTFS_DIR/etc/systemd/system/arxisos-gpu-setup.service" > /dev/null << 'GPUSETUP_EOF'
+[Unit]
+Description=ArxisOS GPU Driver Setup (installs NVIDIA driver on first boot)
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=!/var/lib/arxisos-gpu-setup-done
+ConditionKernelCommandLine=!rd.live.image
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/arxisos-gpu-setup.sh
+ExecStartPost=/bin/touch /var/lib/arxisos-gpu-setup-done
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+GPUSETUP_EOF
+sudo chroot "$ROOTFS_DIR" systemctl enable arxisos-gpu-setup.service 2>/dev/null || true
+sudo ln -sf /etc/systemd/system/arxisos-gpu-setup.service "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants/arxisos-gpu-setup.service" 2>/dev/null || true
+
+# Per-user notifier: when the NVIDIA driver has been built, prompt to reboot.
+sudo tee "$ROOTFS_DIR/usr/local/bin/arxisos-gpu-notify.sh" > /dev/null << 'GPUNOTIFY_SCRIPT'
+#!/bin/bash
+# Shown via KDE autostart. Prompts the user to reboot once the NVIDIA driver
+# has been installed/built, then marks itself shown for this user.
+[ -f /var/lib/arxisos-nvidia-ready ] || exit 0
+SHOWN="$HOME/.config/arxisos-nvidia-notified"
+[ -f "$SHOWN" ] && exit 0
+
+TITLE="ArxisOS — NVIDIA driver ready"
+MSG="The proprietary NVIDIA driver has been installed and built. Please reboot to enable full graphics acceleration."
+
+if command -v kdialog >/dev/null 2>&1; then
+    kdialog --title "$TITLE" --passivepopup "$MSG" 20 >/dev/null 2>&1 || \
+    kdialog --title "$TITLE" --msgbox "$MSG" >/dev/null 2>&1 || true
+elif command -v notify-send >/dev/null 2>&1; then
+    notify-send -u critical -t 20000 "$TITLE" "$MSG" >/dev/null 2>&1 || true
+fi
+
+mkdir -p "$HOME/.config" && touch "$SHOWN"
+GPUNOTIFY_SCRIPT
+sudo chmod +x "$ROOTFS_DIR/usr/local/bin/arxisos-gpu-notify.sh"
+
+# Autostart entry seeded into /etc/skel so every user gets the one-time prompt.
+sudo mkdir -p "$ROOTFS_DIR/etc/skel/.config/autostart"
+sudo tee "$ROOTFS_DIR/etc/skel/.config/autostart/arxisos-gpu-notify.desktop" > /dev/null << 'GPUNOTIFY_DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=ArxisOS NVIDIA Driver Notice
+Exec=/usr/local/bin/arxisos-gpu-notify.sh
+Icon=arxisos-logo
+X-KDE-autostart-after=panel
+OnlyShowIn=KDE;
+NoDisplay=true
+GPUNOTIFY_DESKTOP
+
+# ============================================
 # PLYMOUTH THEME
 # ============================================
 echo ""
@@ -875,14 +1004,20 @@ if [[ -d "$BRANDING_DIR/grub/arxisos" ]]; then
     echo "  - Configuring GRUB defaults..."
     sudo sed -i '/^GRUB_THEME=/d;/^GRUB_DISTRIBUTOR=/d;/^GRUB_DISABLE_OS_PROBER=/d;/^GRUB_GFXMODE=/d;/^GRUB_GFXPAYLOAD_LINUX=/d' "$ROOTFS_DIR/etc/default/grub" 2>/dev/null || true
 
-    # Ensure rhgb quiet is in GRUB_CMDLINE_LINUX for Plymouth splash
+    # Ensure rhgb quiet is in GRUB_CMDLINE_LINUX for Plymouth splash.
+    # Also blacklist nouveau so a disk-installed ArxisOS boots to a desktop on
+    # NVIDIA Ada Lovelace / RTX 40xx hardware (nouveau KMS = black screen there).
+    # The akmod-nvidia proprietary driver (installed at first boot by
+    # arxisos-gpu-setup.service) blacklists nouveau itself once present, so this
+    # is the pre-driver safety net that gets us to a desktop on any GPU.
+    GRUB_EXTRA_CMDLINE="rhgb quiet rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0"
     if grep -q "^GRUB_CMDLINE_LINUX=" "$ROOTFS_DIR/etc/default/grub" 2>/dev/null; then
         # Add rhgb quiet if not already present
         if ! grep -q "rhgb" "$ROOTFS_DIR/etc/default/grub"; then
-            sudo sed -i 's/^GRUB_CMDLINE_LINUX="\(.*\)"/GRUB_CMDLINE_LINUX="\1 rhgb quiet"/' "$ROOTFS_DIR/etc/default/grub"
+            sudo sed -i "s/^GRUB_CMDLINE_LINUX=\"\(.*\)\"/GRUB_CMDLINE_LINUX=\"\1 ${GRUB_EXTRA_CMDLINE}\"/" "$ROOTFS_DIR/etc/default/grub"
         fi
     else
-        echo 'GRUB_CMDLINE_LINUX="rhgb quiet"' | sudo tee -a "$ROOTFS_DIR/etc/default/grub" >/dev/null
+        echo "GRUB_CMDLINE_LINUX=\"${GRUB_EXTRA_CMDLINE}\"" | sudo tee -a "$ROOTFS_DIR/etc/default/grub" >/dev/null
     fi
 
     sudo mkdir -p "$ROOTFS_DIR/etc/default"
@@ -950,10 +1085,16 @@ if [[ -f "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg" ]]; then
         -e "s/--class fedora/--class arxisos/g" \
         "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg"
 
-    # Add permissive SELinux for live boot plus splash flags
+    # Add permissive SELinux for live boot plus splash flags.
+    # nouveau.modeset=0 + blacklist: nouveau has no working KMS on NVIDIA Ada
+    # Lovelace (RTX 40-series, e.g. 4080 = AD103) and similar new GPUs. Without
+    # this the GRUB/Plymouth splash shows (firmware framebuffer) but the desktop
+    # is a black screen with only an X cursor once nouveau tries to mode-set.
+    # Blacklisting it keeps the generic simpledrm/efifb framebuffer into the
+    # desktop. Targeted (not global nomodeset) so Intel/AMD iGPU KMS still works.
     sudo sed -i \
-        -e '/^\s*linux/s/$/ selinux=1 enforcing=0 rhgb quiet/' \
-        -e '/^\s*linuxefi/s/$/ selinux=1 enforcing=0 rhgb quiet/' \
+        -e '/^\s*linux/s/$/ selinux=1 enforcing=0 rhgb quiet rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0/' \
+        -e '/^\s*linuxefi/s/$/ selinux=1 enforcing=0 rhgb quiet rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0/' \
         "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg"
 
     # Add theme configuration
@@ -987,10 +1128,12 @@ if [[ -f "$WORK_DIR/new_iso/boot/grub2/grub.cfg" ]]; then
         -e "s/--class fedora/--class arxisos/g" \
         "$WORK_DIR/new_iso/boot/grub2/grub.cfg"
 
-    # Add permissive SELinux for live boot plus splash flags
+    # Add permissive SELinux for live boot plus splash flags.
+    # See EFI block above for why nouveau is blacklisted (Ada Lovelace / RTX 40xx
+    # black-screen-with-cursor). Keep both blocks in sync.
     sudo sed -i \
-        -e '/^\s*linux/s/$/ selinux=1 enforcing=0 rhgb quiet/' \
-        -e '/^\s*linuxefi/s/$/ selinux=1 enforcing=0 rhgb quiet/' \
+        -e '/^\s*linux/s/$/ selinux=1 enforcing=0 rhgb quiet rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0/' \
+        -e '/^\s*linuxefi/s/$/ selinux=1 enforcing=0 rhgb quiet rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0/' \
         "$WORK_DIR/new_iso/boot/grub2/grub.cfg"
 
     if ! grep -q "set theme=" "$WORK_DIR/new_iso/boot/grub2/grub.cfg"; then
@@ -1553,15 +1696,15 @@ echo "=== Applying OS Branding ==="
 sudo mkdir -p "$ROOTFS_DIR/usr/lib"
 sudo tee "$ROOTFS_DIR/usr/lib/os-release" > /dev/null << 'EOF'
 NAME="ArxisOS"
-VERSION="1.0 (Loopback)"
+VERSION="1.2 (Loopback)"
 ID=arxisos
 ID_LIKE=fedora
-VERSION_ID=1.0
+VERSION_ID=1.2
 VERSION_CODENAME=loopback
-PRETTY_NAME="ArxisOS 1.0 (Loopback)"
+PRETTY_NAME="ArxisOS 1.2 (Loopback)"
 ANSI_COLOR="0;38;2;129;212;250"
 LOGO=arxisos-logo
-CPE_NAME="cpe:/o:arxisos:arxisos:1"
+CPE_NAME="cpe:/o:arxisos:arxisos:1.2"
 VARIANT="KDE Plasma"
 VARIANT_ID=kde
 HOME_URL="https://arxisos.com"
@@ -1574,18 +1717,18 @@ EOF
 # /etc/os-release is conventionally a relative symlink to the canonical file.
 sudo ln -sf ../usr/lib/os-release "$ROOTFS_DIR/etc/os-release"
 
-echo "ArxisOS release 1.0 (Loopback)" | sudo tee "$ROOTFS_DIR/etc/system-release" > /dev/null
-echo "ArxisOS release 1.0 (Loopback)" | sudo tee "$ROOTFS_DIR/etc/arxisos-release" > /dev/null
+echo "ArxisOS release 1.2 (Loopback)" | sudo tee "$ROOTFS_DIR/etc/system-release" > /dev/null
+echo "ArxisOS release 1.2 (Loopback)" | sudo tee "$ROOTFS_DIR/etc/arxisos-release" > /dev/null
 
 # Console login banners (otherwise inherited from fedora-release / setup pkgs).
-printf 'ArxisOS 1.0 (Loopback) \\r (\\l)\n\n' | sudo tee "$ROOTFS_DIR/etc/issue" > /dev/null
-printf 'ArxisOS 1.0 (Loopback)\n' | sudo tee "$ROOTFS_DIR/etc/issue.net" > /dev/null
+printf 'ArxisOS 1.2 (Loopback) \\r (\\l)\n\n' | sudo tee "$ROOTFS_DIR/etc/issue" > /dev/null
+printf 'ArxisOS 1.2 (Loopback)\n' | sudo tee "$ROOTFS_DIR/etc/issue.net" > /dev/null
 
 sudo tee "$ROOTFS_DIR/etc/lsb-release" > /dev/null << 'EOF'
 DISTRIB_ID=ArxisOS
-DISTRIB_RELEASE=1.0
+DISTRIB_RELEASE=1.2
 DISTRIB_CODENAME=loopback
-DISTRIB_DESCRIPTION="ArxisOS 1.0 (Loopback)"
+DISTRIB_DESCRIPTION="ArxisOS 1.2 (Loopback)"
 DISTRIB_DEVELOPER="Brad Heffernan"
 EOF
 

@@ -5,7 +5,8 @@ Guidance for Claude Code working in this repository. Read this first.
 ## What this project is
 
 **ArxisOS** is a **Fedora 43 / KDE Plasma 6 remix** aimed at IT engineers, by Brad Heffernan.
-First stable release: **ArxisOS 1.0 "Loopback"** (`VERSION_CODENAME=loopback`).
+Current release: **ArxisOS 1.2 "Loopback"** (`VERSION_CODENAME=loopback`). (Was 1.0; the
+codename stays `Loopback` across point releases — bump the version number only.)
 
 > Codename note: `Loopback` = `127.0.0.1` / the `lo` interface — networking-themed, nothing
 > to do with screen-casting or any remote-access tool. Do **not** rename it without being asked.
@@ -49,11 +50,11 @@ ISO_DIR="$PWD" ./scripts/build-and-brand.sh
 
 # 3. test in a VM (UEFI; Secure Boot OFF for first run)
 qemu-system-x86_64 -m 4096 -enable-kvm -smp 4 \
-  -bios /usr/share/edk2/ovmf/OVMF_CODE.fd -cdrom ArxisOS-1.0-x86_64.iso
+  -bios /usr/share/edk2/ovmf/OVMF_CODE.fd -cdrom ArxisOS-1.2-x86_64.iso
 
 # 4. in the live VM, confirm identity + theming:
-cat /usr/lib/os-release   # PRETTY_NAME="ArxisOS 1.0 (Loopback)"
-hostnamectl               # Operating System: ArxisOS 1.0 (Loopback)
+cat /usr/lib/os-release   # PRETTY_NAME="ArxisOS 1.2 (Loopback)"
+hostnamectl               # Operating System: ArxisOS 1.2 (Loopback)
 ls /usr/share/wallpapers/ArxisOS
 kreadconfig6 --file kwinrc --group org.kde.kdecoration2 --key theme
 #   → __aurorae__svg__PurPurDayBlur-Aurorae-6
@@ -73,6 +74,27 @@ kreadconfig6 --file kwinrc --group org.kde.kdecoration2 --key theme
    **`/usr/lib/os-release`** (canonical) and symlink `/etc/os-release` → it. Never write only
    `/etc/os-release` (Fedora identity leaks via the canonical file otherwise).
 3. **Run `./scripts/validate.sh` before every build.**
+4. **GPU boot params are load-bearing.** All live + installed kernel cmdlines carry
+   `rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0` so the
+   image boots on NVIDIA Ada Lovelace / RTX 40xx (nouveau = black-screen-with-cursor).
+   Set in 3 places — keep in sync: live `grub.cfg` (EFI+BIOS) and installed
+   `GRUB_CMDLINE_LINUX` in `apply-composer-branding.sh`, and `bootloader --append=` in
+   the kickstart. The proprietary driver is pulled post-install by
+   `arxisos-gpu-setup.service` (NVIDIA-only, network-gated). Don't remove the blacklist;
+   it's harmless to AMD/Intel (they use in-kernel KMS).
+
+## Build environment reality (the Fedora host)
+
+- **`sudo` needs a password** here (user is in `wheel`, no `NOPASSWD`; not in `weldr`).
+  So `build-iso.sh`, `apply-composer-branding.sh`, and burning a USB **cannot run
+  unattended** — they need the password entered interactively. An AFK/auto run can do
+  all the *source/doc* edits and `validate.sh`, but not the build or burn.
+- **The build dir `/home/bheffernan/arxisos-build` is a *copy*, not the git repo.**
+  `build-and-brand.sh` defaults `ISO_DIR=$HOME/arxisos-build` and the scripts hardcode
+  `BUILD_DIR=/home/bheffernan/arxisos-build`. Edits made in this git checkout
+  (`/media/Windows1/Projects/ArxisOS`) must be **rsynced into that dir before building**
+  (it's `bheffernan`-writable, no sudo needed). `scripts/finish-build.sh` does the sync +
+  build + brand + burn in one go.
 
 ## Session progress (2026-05-30) — 16-point audit + repair, COMPLETE
 
@@ -102,8 +124,33 @@ All fixes applied and verified (0 CRLF, all scripts pass `bash -n`):
 - Verify on real boot: GRUB theme renders (needs DejaVu `.pf2` fonts generated at build time),
   Plymouth splash shows, SDDM login uses the arxisos theme, desktop wallpaper + decorations apply.
 
+## Session progress (2026-05-31) — hardware GPU boot fix + 1.2, BUILT & BURNED
+
+Real-hardware test (i7-13700K + RTX 4080) booted the splash fine but hung at a
+**black screen with a top-left cursor** on *Start ArxisOS*. Root cause: `nouveau`
+can't drive Ada Lovelace. Fixed + shipped a universal multi-GPU boot path and bumped
+to **1.2** (codename unchanged). Details in `REPAIRS.md` (2026-05-31 section).
+
+- **GPU (live + installed):** nouveau blacklist on every kernel cmdline (NVIDIA boots
+  via `simpledrm`; AMD/Intel unaffected). `validate.sh` passes; all scripts `bash -n` OK.
+- **Installed NVIDIA:** new `arxisos-gpu-setup.service` (first-boot, network-gated)
+  installs `akmod-nvidia` + `arxisos-gpu-notify` KDE popup to prompt a reboot.
+- **1.2 bump:** all 3 identity paths + blueprint `version="1.2.0"` + ISO name/label.
+- **Build + burn DONE:** `scripts/finish-build.sh` ran interactively (one sudo prompt);
+  `ArxisOS-1.2-x86_64.iso` built, branded, and written to the USB stick. `sudo` needs a
+  password here, so this step is interactive-only (see "Build environment reality").
+
 ## Next step
 
-User is rebooting into Fedora to run the build. Pick up by running `./scripts/validate.sh`
-then `./scripts/build-and-brand.sh`, and triage anything that surfaces in the live VM
-(build logs land at `/root/arxisos-*.log`).
+Boot the freshly-burned 1.2 USB on the RTX 4080 box and confirm it now reaches
+SDDM/desktop (was: black screen + cursor). In the live session, verify:
+
+```bash
+cat /usr/lib/os-release            # PRETTY_NAME="ArxisOS 1.2 (Loopback)"
+cat /proc/cmdline | grep -o 'blacklist=nouveau'   # nouveau blacklisted
+lsmod | grep -c nouveau            # expect 0 (nouveau not loaded)
+```
+
+If it still hangs: at the GRUB menu press `e`, confirm the `linux` line carries
+`rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0`. Logs —
+build: `/root/arxisos-*.log`; post-install GPU driver: `/var/log/arxisos-gpu-setup.log`.

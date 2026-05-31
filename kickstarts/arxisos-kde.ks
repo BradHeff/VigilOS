@@ -15,7 +15,10 @@ firewall --enabled --service=mdns,kdeconnect
 network --bootproto=dhcp --device=link --activate --hostname=arxisos
 
 # Bootloader
-bootloader --timeout=5
+# Blacklist nouveau: it has no working KMS on NVIDIA Ada Lovelace / RTX 40xx
+# (e.g. GTX/RTX 4080 = AD103) and boots to a black screen with only a cursor.
+# The akmod-nvidia driver installed at first boot takes over once present.
+bootloader --timeout=5 --append="rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0"
 
 # Disk partitioning (16GB for KDE + apps)
 zerombr
@@ -124,15 +127,15 @@ plymouth-plugin-script
 # reports "Fedora"; /etc/os-release becomes a symlink to it.
 cat > /usr/lib/os-release << 'EOF'
 NAME="ArxisOS"
-VERSION="1.0 (Loopback)"
+VERSION="1.2 (Loopback)"
 ID=arxisos
 ID_LIKE=fedora
-VERSION_ID=1.0
+VERSION_ID=1.2
 VERSION_CODENAME=loopback
-PRETTY_NAME="ArxisOS 1.0 (Loopback)"
+PRETTY_NAME="ArxisOS 1.2 (Loopback)"
 ANSI_COLOR="0;38;2;129;212;250"
 LOGO=arxisos-logo
-CPE_NAME="cpe:/o:arxisos:arxisos:1"
+CPE_NAME="cpe:/o:arxisos:arxisos:1.2"
 VARIANT="KDE Plasma"
 VARIANT_ID=kde
 HOME_URL="https://arxisos.com"
@@ -144,16 +147,16 @@ EOF
 ln -sf ../usr/lib/os-release /etc/os-release
 
 cat > /etc/system-release << 'EOF'
-ArxisOS release 1.0 (Loopback)
+ArxisOS release 1.2 (Loopback)
 EOF
 
 cat > /etc/arxisos-release << 'EOF'
-ArxisOS release 1.0 (Loopback)
+ArxisOS release 1.2 (Loopback)
 EOF
 
 # Console login banners (otherwise inherited from fedora-release / setup).
-printf 'ArxisOS 1.0 (Loopback) \\r (\\l)\n\n' > /etc/issue
-printf 'ArxisOS 1.0 (Loopback)\n' > /etc/issue.net
+printf 'ArxisOS 1.2 (Loopback) \\r (\\l)\n\n' > /etc/issue
+printf 'ArxisOS 1.2 (Loopback)\n' > /etc/issue.net
 
 # ----------------------
 # Flatpak Setup - Repo only (installs at first boot)
@@ -178,6 +181,16 @@ dnf install -y \
 
 # Install multimedia codecs
 dnf install -y ffmpeg gstreamer1-plugins-bad-freeworld gstreamer1-plugins-ugly
+
+# Install the proprietary NVIDIA driver if an NVIDIA GPU is present.
+# Required for RTX 40xx (Ada Lovelace) and other recent cards that nouveau
+# cannot drive. akmod-nvidia blacklists nouveau itself; we keep the kernel
+# cmdline blacklist as the pre-driver safety net so first boot reaches a desktop.
+if lspci -d 10de: 2>/dev/null | grep -qi 'VGA\|3D'; then
+    dnf install -y akmod-nvidia xorg-x11-drv-nvidia-cuda
+    # Build the kmod now so the desktop comes up driven on the next boot.
+    akmods --force 2>/dev/null || true
+fi
 
 # Install flatpak applications
 flatpak install -y flathub com.google.Chrome

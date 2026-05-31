@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0-blue?style=for-the-badge" alt="Version"/>
+  <img src="https://img.shields.io/badge/version-1.2-blue?style=for-the-badge" alt="Version"/>
   <img src="https://img.shields.io/badge/base-Fedora%2043-51A2DA?style=for-the-badge" alt="Base"/>
   <img src="https://img.shields.io/badge/desktop-KDE%20Plasma%206-1D99F3?style=for-the-badge" alt="Desktop"/>
   <img src="https://img.shields.io/badge/license-GPL--3.0-green?style=for-the-badge" alt="License"/>
@@ -28,11 +28,11 @@
 
 ## Overview
 
-**ArxisOS 1.0 "Loopback"** is a Linux distribution based on Fedora 43, featuring the KDE Plasma 6 desktop environment. Built for IT engineers and power users, it pairs the stability and security of Fedora with a cohesive custom visual identity and a sensible default toolset.
+**ArxisOS 1.2 "Loopback"** is a Linux distribution based on Fedora 43, featuring the KDE Plasma 6 desktop environment. Built for IT engineers and power users, it pairs the stability and security of Fedora with a cohesive custom visual identity and a sensible default toolset.
 
 Whether you're a sysadmin, network engineer, developer, or power user, ArxisOS provides a polished, cohesive experience right out of the box.
 
-> **Release codename:** `Loopback` (`VERSION_CODENAME=loopback`). The first stable release is **ArxisOS 1.0 "Loopback"**.
+> **Release codename:** `Loopback` (`VERSION_CODENAME=loopback`). Current release: **ArxisOS 1.2 "Loopback"** (first stable was 1.0). The codename stays `Loopback` across point releases.
 
 ---
 
@@ -153,7 +153,7 @@ Download the latest ArxisOS ISO from the [Releases](https://github.com/arxisos/a
 
 #### Linux
 ```bash
-sudo dd if=ArxisOS-1.0-x86_64.iso of=/dev/sdX bs=4M status=progress oflag=sync
+sudo dd if=ArxisOS-1.2-x86_64.iso of=/dev/sdX bs=4M status=progress oflag=sync
 ```
 
 #### Windows
@@ -161,7 +161,7 @@ Use [Rufus](https://rufus.ie/) or [balenaEtcher](https://www.balena.io/etcher/)
 
 #### macOS
 ```bash
-sudo dd if=ArxisOS-1.0-x86_64.iso of=/dev/diskN bs=4m
+sudo dd if=ArxisOS-1.2-x86_64.iso of=/dev/diskN bs=4m
 ```
 
 ### Installation Process
@@ -282,7 +282,7 @@ We are developing **ApM (Arxis Package Manager)** — a next-generation package 
 
 4. **Apply ArxisOS branding:**
    ```bash
-   sudo ./scripts/apply-composer-branding.sh <base-iso> ArxisOS-1.0-x86_64.iso
+   sudo ./scripts/apply-composer-branding.sh <base-iso> ArxisOS-1.2-x86_64.iso
    ```
 
 ### Project Structure
@@ -401,7 +401,12 @@ We welcome contributions to ArxisOS! Here's how you can help:
 
 ## Roadmap
 
-### Version 1.0 (Current)
+### Version 1.2 (Current)
+- [x] Universal multi-GPU live boot (NVIDIA RTX 40xx/Ada via nouveau blacklist; AMD/Intel native KMS)
+- [x] Automatic proprietary NVIDIA driver install on first boot (installed systems) + reboot prompt
+- [x] Everything from 1.0
+
+### Version 1.0
 - [x] KDE Plasma 6 desktop
 - [x] PurPurDay theme integration
 - [x] Custom boot splash and login screen

@@ -1,6 +1,6 @@
 name = "arxisos-kde"
 description = "ArxisOS KDE Plasma Desktop"
-version = "1.0.3"
+version = "1.2.0"
 distro = "fedora-43"
 
 # KDE Plasma and core groups

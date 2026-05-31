@@ -64,12 +64,12 @@ if [ -n "${2:-}" ]; then
         *)  ISO_OUTPUT="$BUILD_DIR/$2" ;;  # Make absolute
     esac
 else
-    ISO_OUTPUT="$BUILD_DIR/ArxisOS-1.0-x86_64.iso"
+    ISO_OUTPUT="$BUILD_DIR/ArxisOS-1.2-x86_64.iso"
 fi
 
 if [ -z "$ISO_INPUT" ]; then
     echo "Usage: $0 <input-iso> [output-iso]"
-    echo "Example: $0 fedora-live.iso ArxisOS-1.0.iso"
+    echo "Example: $0 fedora-live.iso ArxisOS-1.2.iso"
     exit 1
 fi
 
@@ -116,7 +116,7 @@ if [ -f "$WORK_DIR/new_iso/.discinfo" ]; then
     echo "Updating .discinfo..."
     sudo tee "$WORK_DIR/new_iso/.discinfo" > /dev/null << DISCINFO_EOF
 $(date +%s.%N)
-ArxisOS 1.0
+ArxisOS 1.2
 x86_64
 DISCINFO_EOF
 fi
@@ -1225,15 +1225,15 @@ echo "  - OS release info"
 sudo mkdir -p "$ROOTFS_DIR/usr/lib"
 sudo tee "$ROOTFS_DIR/usr/lib/os-release" > /dev/null << 'EOF'
 NAME="ArxisOS"
-VERSION="1.0 (Loopback)"
+VERSION="1.2 (Loopback)"
 ID=arxisos
 ID_LIKE=fedora
-VERSION_ID=1.0
+VERSION_ID=1.2
 VERSION_CODENAME=loopback
-PRETTY_NAME="ArxisOS 1.0 (Loopback)"
+PRETTY_NAME="ArxisOS 1.2 (Loopback)"
 ANSI_COLOR="0;38;2;129;212;250"
 LOGO=arxisos-logo
-CPE_NAME="cpe:/o:arxisos:arxisos:1"
+CPE_NAME="cpe:/o:arxisos:arxisos:1.2"
 VARIANT="KDE Plasma"
 VARIANT_ID=kde
 HOME_URL="https://arxisos.com"
@@ -1245,19 +1245,19 @@ DEVELOPER="Brad Heffernan"
 EOF
 sudo ln -sf ../usr/lib/os-release "$ROOTFS_DIR/etc/os-release"
 
-echo "ArxisOS release 1.0 (Loopback)" | sudo tee "$ROOTFS_DIR/etc/system-release" > /dev/null
-echo "ArxisOS release 1.0 (Loopback)" | sudo tee "$ROOTFS_DIR/etc/arxisos-release" > /dev/null
+echo "ArxisOS release 1.2 (Loopback)" | sudo tee "$ROOTFS_DIR/etc/system-release" > /dev/null
+echo "ArxisOS release 1.2 (Loopback)" | sudo tee "$ROOTFS_DIR/etc/arxisos-release" > /dev/null
 
 # Console login banners
-printf 'ArxisOS 1.0 (Loopback) \\r (\\l)\n\n' | sudo tee "$ROOTFS_DIR/etc/issue" > /dev/null
-printf 'ArxisOS 1.0 (Loopback)\n' | sudo tee "$ROOTFS_DIR/etc/issue.net" > /dev/null
+printf 'ArxisOS 1.2 (Loopback) \\r (\\l)\n\n' | sudo tee "$ROOTFS_DIR/etc/issue" > /dev/null
+printf 'ArxisOS 1.2 (Loopback)\n' | sudo tee "$ROOTFS_DIR/etc/issue.net" > /dev/null
 
 # Create lsb-release
 sudo tee "$ROOTFS_DIR/etc/lsb-release" > /dev/null << 'EOF'
 DISTRIB_ID=ArxisOS
-DISTRIB_RELEASE=1.0
+DISTRIB_RELEASE=1.2
 DISTRIB_CODENAME=loopback
-DISTRIB_DESCRIPTION="ArxisOS 1.0 (Loopback)"
+DISTRIB_DESCRIPTION="ArxisOS 1.2 (Loopback)"
 DISTRIB_DEVELOPER="Brad Heffernan"
 EOF
 

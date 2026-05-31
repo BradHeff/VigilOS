@@ -3,7 +3,7 @@ set -euo pipefail
 
 BUILD_DIR="/home/bheffernan/arxisos-build"
 CACHE_DIR="/var/cache/live"
-VERSION="1.0"
+VERSION="1.2"
 ARCH="x86_64"
 ISO_NAME="ArxisOS-$VERSION-$ARCH.iso"
 LOG_FILE="/tmp/arxisos-build.log"
