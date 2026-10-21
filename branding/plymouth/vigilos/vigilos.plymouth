@@ -1,0 +1,13 @@
+[Plymouth Theme]
+Name=VIGILOS
+Description=VIGILOS Boot Theme
+ModuleName=two-step
+
+[two-step]
+ImageDir=/usr/share/plymouth/themes/vigilos
+HorizontalAlignment=.5
+VerticalAlignment=.5
+Transition=none
+TransitionDuration=0.0
+BackgroundStartColor=0x0d1117
+BackgroundEndColor=0x0d1117

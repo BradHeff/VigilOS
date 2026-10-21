@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Run in the installed target, either from Anaconda %post or installed first boot.
+set -euo pipefail
+[[ -s /etc/vigilos-release && -s /etc/fstab && -d /boot/grub2 ]] || { echo 'Installed VIGIL target required' >&2; exit 1; }
+# Anaconda may already have created the user; avoid asking for a second account.
+if getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 && $1 != "liveuser" && $7 !~ /(nologin|false)$/ {found=1} END {exit !found}'; then
+    touch /etc/plasma-setup-done
+    restorecon /etc/plasma-setup-done
+fi
+# Anaconda rewrites /etc/default/grub. Restore product presentation after install.
+mkdir -p /boot/grub2/themes/vigilos
+cp -a /usr/share/grub/themes/vigilos/. /boot/grub2/themes/vigilos/
+sed -i '/^GRUB_THEME=/d;/^GRUB_TERMINAL_OUTPUT=/d;/^GRUB_DISTRIBUTOR=/d;/^GRUB_GFXMODE=/d;/^GRUB_GFXPAYLOAD_LINUX=/d;/^GRUB_FONT=/d' /etc/default/grub
+cat >> /etc/default/grub <<'INSTALLED_GRUB'
+GRUB_DISTRIBUTOR="VIGIL OS"
+GRUB_TERMINAL_OUTPUT="gfxterm"
+GRUB_THEME="/boot/grub2/themes/vigilos/theme.txt"
+GRUB_FONT="/boot/grub2/themes/vigilos/unicode.pf2"
+GRUB_GFXPAYLOAD_LINUX=keep
+INSTALLED_GRUB
+if [[ -d /sys/firmware/efi ]]; then
+    printf 'GRUB_GFXMODE=auto\n' >> /etc/default/grub
+else
+    printf 'GRUB_GFXMODE=1280x800,1024x768,800x600,auto\n' >> /etc/default/grub
+fi
+# A live-image install can inherit the original ISO kernel as saved_entry even
+# when a newer kernel is present. Select the newest installed kernel once;
+# later user/default-kernel choices must survive first-boot fallback and updates.
+if [[ ! -e /var/lib/vigilos-initial-kernel-selected ]]; then
+    latest_kernel="$(rpm -q kernel-core --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' | sort -V | tail -n1)"
+    [[ -n "$latest_kernel" && -s "/boot/vmlinuz-$latest_kernel" ]] || { echo 'Installed kernel missing' >&2; exit 1; }
+    grubby --set-default "/boot/vmlinuz-$latest_kernel"
+    touch /var/lib/vigilos-initial-kernel-selected
+    restorecon /var/lib/vigilos-initial-kernel-selected
+fi
+# Regenerate only the canonical configuration; preserve signed Fedora EFI
+# binaries and the installer-generated EFI config stub.
+grub2-mkconfig -o /boot/grub2/grub.cfg
+restorecon -RF /etc/sddm.conf.d /var/lib/AccountsService /boot

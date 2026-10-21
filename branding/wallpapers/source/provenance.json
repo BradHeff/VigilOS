@@ -1,0 +1,13 @@
+{
+  "asset": "vigil-city-native-1672x941.png",
+  "native_width": 1672,
+  "native_height": 941,
+  "native_4k": false,
+  "sha256": "58f1ea66fc85ad7fa71358fb6e20ee78587600985bae92319b08d7bd078218ca",
+  "library_file_id": "libfile_c18efc8d40f48191919effa0d7c273e9",
+  "file_id": "file_00000000c470820e824b50b94b344dc5",
+  "library_version": 0,
+  "origin": "Image generation edit supplied by parent; VIGIL OS lettering replaces embedded Arxis lettering",
+  "derivative_policy": "Any larger export is an upscaled derivative, generated preserving aspect ratio; never label source as native 4K",
+  "baseline": "vigil-lab/evidence/baseline-assets/arxis-city-original-3840x2160.png"
+}

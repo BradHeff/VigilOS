@@ -1,0 +1,6 @@
+# The legacy X11 IMSettings starter explicitly rejects KDE Wayland.
+# Configure input methods through Plasma System Settings instead.
+[Desktop Entry]
+Type=Application
+Name=Legacy input method starter
+Hidden=true

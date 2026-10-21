@@ -1,4 +1,4 @@
-// ArxisOS Default Desktop Layout
+// VIGIL OS Default Desktop Layout
 // Panel positioned at top with standard KDE Plasma widgets
 
 var panel = new Panel
@@ -9,12 +9,12 @@ panel.alignment = "center"
 panel.hiding = "none"
 panel.lengthMode = "fill"
 
-// Application launcher (Kickoff) with ArxisOS icon
+// Application launcher (Kickoff) with VIGIL OS icon
 var kickoff = panel.addWidget("org.kde.plasma.kickoff")
 kickoff.currentConfigGroup = ["Shortcuts"]
 kickoff.writeConfig("global", "Alt+F1")
 kickoff.currentConfigGroup = ["General"]
-kickoff.writeConfig("icon", "arxisos-start")
+kickoff.writeConfig("icon", "vigilos-start")
 kickoff.writeConfig("favoritesPortedToKAstats", true)
 kickoff.writeConfig("systemFavorites", "suspend,hibernate,reboot,shutdown")
 

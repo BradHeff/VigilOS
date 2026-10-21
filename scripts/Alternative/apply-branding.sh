@@ -1,12 +1,14 @@
 #!/bin/bash
 set -euo pipefail
+echo "ERROR: Alternative build route is not approved for this isolated first pass." >&2
+exit 1
 
-# Apply ArxisOS branding to a Fedora live ISO
+# Apply VIGILOS branding to a Fedora live ISO
 
 # Cleanup function for error handling - handles ALL exit scenarios
 cleanup_mounts() {
     local exit_code=$?
-    local work_dir="/var/tmp/arxisos-remaster"
+    local work_dir="/var/tmp/vigilos-remaster"
 
     # Only show error message if exit code is non-zero
     if [ $exit_code -ne 0 ]; then
@@ -49,12 +51,12 @@ trap cleanup_mounts EXIT
 trap 'exit 1' INT TERM
 # This script modifies the ISO to include custom Plymouth, GRUB, wallpaper, etc.
 
-BUILD_DIR="/home/bheffernan/arxisos-build"
+BUILD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BRANDING_DIR="$BUILD_DIR/branding"
-WORK_DIR="/var/tmp/arxisos-remaster"
+WORK_DIR="/var/tmp/vigilos-remaster"
 
 # ISO volume label - must match GRUB CDLABEL exactly
-ISO_LABEL="ArxisOS-1-0-x86_64"
+ISO_LABEL="VIGILOS-1-0-x86_64"
 
 ISO_INPUT="${1:-}"
 # Ensure output path is absolute
@@ -64,12 +66,12 @@ if [ -n "${2:-}" ]; then
         *)  ISO_OUTPUT="$BUILD_DIR/$2" ;;  # Make absolute
     esac
 else
-    ISO_OUTPUT="$BUILD_DIR/ArxisOS-1.2-x86_64.iso"
+    ISO_OUTPUT="$BUILD_DIR/VIGILOS-1.2-x86_64.iso"
 fi
 
 if [ -z "$ISO_INPUT" ]; then
     echo "Usage: $0 <input-iso> [output-iso]"
-    echo "Example: $0 fedora-live.iso ArxisOS-1.2.iso"
+    echo "Example: $0 fedora-live.iso VIGILOS-1.2.iso"
     exit 1
 fi
 
@@ -78,7 +80,7 @@ if [ ! -f "$ISO_INPUT" ]; then
     exit 1
 fi
 
-echo "=== ArxisOS Branding Application ==="
+echo "=== VIGILOS Branding Application ==="
 echo "Input:  $ISO_INPUT"
 echo "Output: $ISO_OUTPUT"
 echo ""
@@ -116,7 +118,7 @@ if [ -f "$WORK_DIR/new_iso/.discinfo" ]; then
     echo "Updating .discinfo..."
     sudo tee "$WORK_DIR/new_iso/.discinfo" > /dev/null << DISCINFO_EOF
 $(date +%s.%N)
-ArxisOS 1.2
+VIGILOS 1.2
 x86_64
 DISCINFO_EOF
 fi
@@ -127,21 +129,21 @@ echo "Using ISO label: $ISO_LABEL"
 
 # Copy GRUB theme to ISO boot directories
 echo "Copying GRUB theme to ISO..."
-if [ -d "$BRANDING_DIR/grub/arxisos" ]; then
+if [ -d "$BRANDING_DIR/grub/vigilos" ]; then
     # Copy to EFI boot theme directory
-    sudo mkdir -p "$WORK_DIR/new_iso/EFI/BOOT/themes/arxisos"
-    sudo cp -r "$BRANDING_DIR/grub/arxisos/"* "$WORK_DIR/new_iso/EFI/BOOT/themes/arxisos/"
+    sudo mkdir -p "$WORK_DIR/new_iso/EFI/BOOT/themes/vigilos"
+    sudo cp -r "$BRANDING_DIR/grub/vigilos/"* "$WORK_DIR/new_iso/EFI/BOOT/themes/vigilos/"
 
     # Copy to boot/grub2 for BIOS boot
-    sudo mkdir -p "$WORK_DIR/new_iso/boot/grub2/themes/arxisos"
-    sudo cp -r "$BRANDING_DIR/grub/arxisos/"* "$WORK_DIR/new_iso/boot/grub2/themes/arxisos/"
+    sudo mkdir -p "$WORK_DIR/new_iso/boot/grub2/themes/vigilos"
+    sudo cp -r "$BRANDING_DIR/grub/vigilos/"* "$WORK_DIR/new_iso/boot/grub2/themes/vigilos/"
     echo "  - GRUB theme copied to ISO"
 
     # Convert PNG files to GRUB-compatible format (24-bit RGB, no alpha channel)
     # GRUB has issues with 32-bit RGBA PNGs - causes garbled display
     echo "  - Converting PNG files to GRUB-compatible format..."
     if command -v convert &> /dev/null; then
-        for THEME_DIR in "$WORK_DIR/new_iso/EFI/BOOT/themes/arxisos" "$WORK_DIR/new_iso/boot/grub2/themes/arxisos"; do
+        for THEME_DIR in "$WORK_DIR/new_iso/EFI/BOOT/themes/vigilos" "$WORK_DIR/new_iso/boot/grub2/themes/vigilos"; do
             find "$THEME_DIR" -name "*.png" -type f | while read -r png_file; do
                 # Convert to 24-bit RGB (remove alpha channel, flatten to black background for transparency)
                 sudo convert "$png_file" -background black -alpha remove -alpha off -depth 8 "$png_file.tmp" 2>/dev/null && \
@@ -169,7 +171,7 @@ if [ -d "$BRANDING_DIR/grub/arxisos" ]; then
         DEJAVU_MONO=$(find /usr/share/fonts -name "DejaVuSansMono.ttf" 2>/dev/null | head -1)
 
         # Generate fonts for both EFI and BIOS theme directories
-        for THEME_DIR in "$WORK_DIR/new_iso/EFI/BOOT/themes/arxisos" "$WORK_DIR/new_iso/boot/grub2/themes/arxisos"; do
+        for THEME_DIR in "$WORK_DIR/new_iso/EFI/BOOT/themes/vigilos" "$WORK_DIR/new_iso/boot/grub2/themes/vigilos"; do
             if [ -n "$DEJAVU_REGULAR" ]; then
                 sudo $GRUB_MKFONT -s 11 -o "$THEME_DIR/dejavu_sans_11.pf2" "$DEJAVU_REGULAR" 2>/dev/null || true
                 sudo $GRUB_MKFONT -s 16 -o "$THEME_DIR/dejavu_sans_16.pf2" "$DEJAVU_REGULAR" 2>/dev/null || true
@@ -186,7 +188,7 @@ if [ -d "$BRANDING_DIR/grub/arxisos" ]; then
     fi
 
     # Copy unicode.pf2 as fallback
-    for THEME_DIR in "$WORK_DIR/new_iso/EFI/BOOT/themes/arxisos" "$WORK_DIR/new_iso/boot/grub2/themes/arxisos"; do
+    for THEME_DIR in "$WORK_DIR/new_iso/EFI/BOOT/themes/vigilos" "$WORK_DIR/new_iso/boot/grub2/themes/vigilos"; do
         if [ -f /usr/share/grub/unicode.pf2 ]; then
             sudo cp /usr/share/grub/unicode.pf2 "$THEME_DIR/" 2>/dev/null || true
         elif [ -f /boot/grub2/fonts/unicode.pf2 ]; then
@@ -201,11 +203,11 @@ if [ -f "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg" ]; then
     sudo sed -i \
         -e "s/CDLABEL=Fedora-[0-9]*-[A-Za-z]*-x86_64/CDLABEL=${ISO_LABEL}/g" \
         -e "s/-l 'Fedora-[0-9]*-[A-Za-z]*-x86_64'/-l '${ISO_LABEL}'/g" \
-        -e "s/Install Fedora [0-9]*/Start ArxisOS/g" \
-        -e "s/Test this media & install Fedora [0-9]*/Test Media \& Start ArxisOS/g" \
-        -e "s/Install Fedora [0-9]* in basic graphics mode/Start ArxisOS (Basic Graphics)/g" \
-        -e "s/Rescue a Fedora system/Rescue ArxisOS System/g" \
-        -e "s/--class fedora/--class arxisos/g" \
+        -e "s/Install Fedora [0-9]*/Start VIGIL OS/g" \
+        -e "s/Test this media & install Fedora [0-9]*/Test Media \& Start VIGIL OS/g" \
+        -e "s/Install Fedora [0-9]* in basic graphics mode/Start VIGIL OS (Basic Graphics)/g" \
+        -e "s/Rescue a Fedora system/Rescue VIGIL OS System/g" \
+        -e "s/--class fedora/--class vigilos/g" \
         "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg"
 
     # Add enforcing=0 to kernel boot parameters for permissive SELinux
@@ -219,7 +221,7 @@ if [ -f "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg" ]; then
         # Create temp file with theme config prepended
         # Use ($root) to reference the boot device (ISO filesystem)
         {
-            echo '# ArxisOS GRUB Theme Configuration'
+            echo '# VIGILOS GRUB Theme Configuration'
             echo 'insmod all_video'
             echo 'insmod gfxterm'
             echo 'insmod gfxmenu'
@@ -229,17 +231,17 @@ if [ -f "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg" ]; then
             echo 'terminal_output gfxterm'
             echo ''
             echo '# Load fonts for theme'
-            echo 'if [ -f ($root)/EFI/BOOT/themes/arxisos/dejavu_sans_16.pf2 ]; then'
-            echo '    loadfont ($root)/EFI/BOOT/themes/arxisos/dejavu_sans_11.pf2'
-            echo '    loadfont ($root)/EFI/BOOT/themes/arxisos/dejavu_sans_16.pf2'
-            echo '    loadfont ($root)/EFI/BOOT/themes/arxisos/dejavu_sans_bold_16.pf2'
-            echo '    loadfont ($root)/EFI/BOOT/themes/arxisos/dejavu_sans_bold_24.pf2'
-            echo '    loadfont ($root)/EFI/BOOT/themes/arxisos/dejavu_mono_14.pf2'
-            echo 'elif [ -f ($root)/EFI/BOOT/themes/arxisos/unicode.pf2 ]; then'
-            echo '    loadfont ($root)/EFI/BOOT/themes/arxisos/unicode.pf2'
+            echo 'if [ -f ($root)/EFI/BOOT/themes/vigilos/dejavu_sans_16.pf2 ]; then'
+            echo '    loadfont ($root)/EFI/BOOT/themes/vigilos/dejavu_sans_11.pf2'
+            echo '    loadfont ($root)/EFI/BOOT/themes/vigilos/dejavu_sans_16.pf2'
+            echo '    loadfont ($root)/EFI/BOOT/themes/vigilos/dejavu_sans_bold_16.pf2'
+            echo '    loadfont ($root)/EFI/BOOT/themes/vigilos/dejavu_sans_bold_24.pf2'
+            echo '    loadfont ($root)/EFI/BOOT/themes/vigilos/dejavu_mono_14.pf2'
+            echo 'elif [ -f ($root)/EFI/BOOT/themes/vigilos/unicode.pf2 ]; then'
+            echo '    loadfont ($root)/EFI/BOOT/themes/vigilos/unicode.pf2'
             echo 'fi'
             echo ''
-            echo 'set theme=($root)/EFI/BOOT/themes/arxisos/theme.txt'
+            echo 'set theme=($root)/EFI/BOOT/themes/vigilos/theme.txt'
             echo 'export theme'
             echo ''
             cat "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg"
@@ -254,11 +256,11 @@ if [ -f "$WORK_DIR/new_iso/boot/grub2/grub.cfg" ]; then
     sudo sed -i \
         -e "s/CDLABEL=Fedora-[0-9]*-[A-Za-z]*-x86_64/CDLABEL=${ISO_LABEL}/g" \
         -e "s/-l 'Fedora-[0-9]*-[A-Za-z]*-x86_64'/-l '${ISO_LABEL}'/g" \
-        -e "s/Install Fedora [0-9]*/Start ArxisOS/g" \
-        -e "s/Test this media & install Fedora [0-9]*/Test Media \& Start ArxisOS/g" \
-        -e "s/Install Fedora [0-9]* in basic graphics mode/Start ArxisOS (Basic Graphics)/g" \
-        -e "s/Rescue a Fedora system/Rescue ArxisOS System/g" \
-        -e "s/--class fedora/--class arxisos/g" \
+        -e "s/Install Fedora [0-9]*/Start VIGIL OS/g" \
+        -e "s/Test this media & install Fedora [0-9]*/Test Media \& Start VIGIL OS/g" \
+        -e "s/Install Fedora [0-9]* in basic graphics mode/Start VIGIL OS (Basic Graphics)/g" \
+        -e "s/Rescue a Fedora system/Rescue VIGIL OS System/g" \
+        -e "s/--class fedora/--class vigilos/g" \
         "$WORK_DIR/new_iso/boot/grub2/grub.cfg"
 
     # Add enforcing=0 to kernel boot parameters for permissive SELinux
@@ -270,7 +272,7 @@ if [ -f "$WORK_DIR/new_iso/boot/grub2/grub.cfg" ]; then
     # Add GRUB theme configuration for BIOS boot
     if ! grep -q "set theme=" "$WORK_DIR/new_iso/boot/grub2/grub.cfg"; then
         {
-            echo '# ArxisOS GRUB Theme Configuration'
+            echo '# VIGILOS GRUB Theme Configuration'
             echo 'insmod all_video'
             echo 'insmod gfxterm'
             echo 'insmod gfxmenu'
@@ -280,19 +282,19 @@ if [ -f "$WORK_DIR/new_iso/boot/grub2/grub.cfg" ]; then
             echo 'terminal_output gfxterm'
             echo ''
             echo '# Load fonts for theme'
-            echo 'if [ -f ($root)/boot/grub2/themes/arxisos/dejavu_sans_16.pf2 ]; then'
-            echo '    loadfont ($root)/boot/grub2/themes/arxisos/dejavu_sans_11.pf2'
-            echo '    loadfont ($root)/boot/grub2/themes/arxisos/dejavu_sans_16.pf2'
-            echo '    loadfont ($root)/boot/grub2/themes/arxisos/dejavu_sans_bold_16.pf2'
-            echo '    loadfont ($root)/boot/grub2/themes/arxisos/dejavu_sans_bold_24.pf2'
-            echo '    loadfont ($root)/boot/grub2/themes/arxisos/dejavu_mono_14.pf2'
-            echo 'elif [ -f ($root)/boot/grub2/themes/arxisos/unicode.pf2 ]; then'
-            echo '    loadfont ($root)/boot/grub2/themes/arxisos/unicode.pf2'
+            echo 'if [ -f ($root)/boot/grub2/themes/vigilos/dejavu_sans_16.pf2 ]; then'
+            echo '    loadfont ($root)/boot/grub2/themes/vigilos/dejavu_sans_11.pf2'
+            echo '    loadfont ($root)/boot/grub2/themes/vigilos/dejavu_sans_16.pf2'
+            echo '    loadfont ($root)/boot/grub2/themes/vigilos/dejavu_sans_bold_16.pf2'
+            echo '    loadfont ($root)/boot/grub2/themes/vigilos/dejavu_sans_bold_24.pf2'
+            echo '    loadfont ($root)/boot/grub2/themes/vigilos/dejavu_mono_14.pf2'
+            echo 'elif [ -f ($root)/boot/grub2/themes/vigilos/unicode.pf2 ]; then'
+            echo '    loadfont ($root)/boot/grub2/themes/vigilos/unicode.pf2'
             echo 'elif [ -f ($root)/boot/grub2/fonts/unicode.pf2 ]; then'
             echo '    loadfont ($root)/boot/grub2/fonts/unicode.pf2'
             echo 'fi'
             echo ''
-            echo 'set theme=($root)/boot/grub2/themes/arxisos/theme.txt'
+            echo 'set theme=($root)/boot/grub2/themes/vigilos/theme.txt'
             echo 'export theme'
             echo ''
             cat "$WORK_DIR/new_iso/boot/grub2/grub.cfg"
@@ -302,8 +304,8 @@ if [ -f "$WORK_DIR/new_iso/boot/grub2/grub.cfg" ]; then
     echo "  - Updated BIOS GRUB config with theme"
 fi
 
-# Modify initrd to include ArxisOS Plymouth theme
-echo "Modifying initrd with ArxisOS boot splash..."
+# Modify initrd to include VIGILOS Plymouth theme
+echo "Modifying initrd with VIGILOS boot splash..."
 INITRD_WORK="$WORK_DIR/initrd_work"
 mkdir -p "$INITRD_WORK"
 
@@ -316,32 +318,32 @@ if [ -f "$WORK_DIR/new_iso/images/pxeboot/initrd.img" ]; then
 
     # Find and replace Plymouth theme in initrd
     if [ -d "$INITRD_WORK/usr/share/plymouth/themes" ]; then
-        echo "  - Adding ArxisOS Plymouth theme to initrd"
+        echo "  - Adding VIGILOS Plymouth theme to initrd"
 
-        # Create ArxisOS theme directory
-        sudo mkdir -p "$INITRD_WORK/usr/share/plymouth/themes/arxisos"
+        # Create VIGILOS theme directory
+        sudo mkdir -p "$INITRD_WORK/usr/share/plymouth/themes/vigilos"
 
         # Copy the theme files
-        sudo cp "$BRANDING_DIR/plymouth/arxisos/arxisos.plymouth" "$INITRD_WORK/usr/share/plymouth/themes/arxisos/"
-        sudo cp "$BRANDING_DIR/plymouth/arxisos/logo.png" "$INITRD_WORK/usr/share/plymouth/themes/arxisos/"
+        sudo cp "$BRANDING_DIR/plymouth/vigilos/vigilos.plymouth" "$INITRD_WORK/usr/share/plymouth/themes/vigilos/"
+        sudo cp "$BRANDING_DIR/plymouth/vigilos/logo.png" "$INITRD_WORK/usr/share/plymouth/themes/vigilos/"
 
         # Also replace Fedora branding in existing themes (bgrt, spinner, etc.)
         echo "  - Replacing Fedora logos in initrd Plymouth themes"
 
         # Get Plymouth watermark - prefer pre-generated 128x128
         PLYMOUTH_LOGO=""
-        if [ -f "$BRANDING_DIR/logos/arxisos-watermark-128.png" ]; then
-            PLYMOUTH_LOGO="$BRANDING_DIR/logos/arxisos-watermark-128.png"
+        if [ -f "$BRANDING_DIR/logos/vigilos-watermark-128.png" ]; then
+            PLYMOUTH_LOGO="$BRANDING_DIR/logos/vigilos-watermark-128.png"
             echo "    Using pre-generated 128x128 watermark"
-        elif [ -f "$BRANDING_DIR/logos/arxisos-logo.png" ]; then
+        elif [ -f "$BRANDING_DIR/logos/vigilos-logo.png" ]; then
             # Fallback: try to resize the original logo
-            PLYMOUTH_LOGO="/tmp/arxisos-plymouth-logo.png"
+            PLYMOUTH_LOGO="/tmp/vigilos-plymouth-logo.png"
             if command -v magick &> /dev/null; then
                 echo "    Creating resized Plymouth logo (128px)..."
-                magick "$BRANDING_DIR/logos/arxisos-logo.png" -resize 128x128 -background transparent -gravity center "$PLYMOUTH_LOGO" 2>/dev/null || PLYMOUTH_LOGO=""
+                magick "$BRANDING_DIR/logos/vigilos-logo.png" -resize 128x128 -background transparent -gravity center "$PLYMOUTH_LOGO" 2>/dev/null || PLYMOUTH_LOGO=""
             elif command -v convert &> /dev/null; then
                 echo "    Creating resized Plymouth logo (128px)..."
-                convert "$BRANDING_DIR/logos/arxisos-logo.png" -resize 128x128 -background transparent -gravity center "$PLYMOUTH_LOGO" 2>/dev/null || PLYMOUTH_LOGO=""
+                convert "$BRANDING_DIR/logos/vigilos-logo.png" -resize 128x128 -background transparent -gravity center "$PLYMOUTH_LOGO" 2>/dev/null || PLYMOUTH_LOGO=""
             else
                 PLYMOUTH_LOGO=""
             fi
@@ -372,7 +374,7 @@ if [ -f "$WORK_DIR/new_iso/images/pxeboot/initrd.img" ]; then
             fi
 
             # Clean up temp file if we created one
-            [ "$PLYMOUTH_LOGO" = "/tmp/arxisos-plymouth-logo.png" ] && rm -f "$PLYMOUTH_LOGO"
+            [ "$PLYMOUTH_LOGO" = "/tmp/vigilos-plymouth-logo.png" ] && rm -f "$PLYMOUTH_LOGO"
         else
             echo "    WARNING: No valid watermark available for initrd"
         fi
@@ -441,14 +443,14 @@ sudo cp -L /etc/resolv.conf "$ROOTFS_DIR/etc/resolv.conf" 2>/dev/null || \
     echo "nameserver 8.8.8.8" | sudo tee "$ROOTFS_DIR/etc/resolv.conf" > /dev/null
 
 # Install KDE Plasma and SDDM
-# Use --releasever=43 to ensure Fedora repos work even if os-release was modified
+# Use --releasever=44 to ensure Fedora repos work even if os-release was modified
 echo "  - Installing plasma-desktop, sddm, konsole, dolphin..."
 echo "    (This may take 10-20 minutes, showing progress...)"
-sudo chroot "$ROOTFS_DIR" dnf install -y --releasever=43 --allowerasing \
-    plasma-desktop plasma-workspace plasma-workspace-x11 sddm sddm-kcm \
+sudo chroot "$ROOTFS_DIR" dnf install -y --releasever=44 --allowerasing \
+    plasma-desktop plasma-workspace plasma-workspace-wayland sddm sddm-kcm sddm-wayland-plasma \
     konsole dolphin kate ark gwenview okular spectacle \
     plasma-nm plasma-pa bluedevil powerdevil kscreen \
-    kwin kwin-x11 breeze-gtk breeze-icon-theme \
+    kwin breeze-gtk breeze-icon-theme \
     xorg-x11-server-Xorg xorg-x11-drv-libinput xorg-x11-xinit \
     plasma-systemmonitor plasma-discover \
     NetworkManager-wifi NetworkManager-bluetooth \
@@ -457,7 +459,7 @@ sudo chroot "$ROOTFS_DIR" dnf install -y --releasever=43 --allowerasing \
 
 # Install bootloader packages - CRITICAL for Anaconda to install GRUB on target disk
 echo "  - Installing bootloader packages (grub2-efi, shim, efibootmgr)..."
-sudo chroot "$ROOTFS_DIR" dnf install -y --releasever=43 \
+sudo chroot "$ROOTFS_DIR" dnf install -y --releasever=44 \
     grub2-efi-x64 grub2-efi-x64-modules shim-x64 \
     grub2-tools grub2-tools-extra efibootmgr grub2-common \
     kernel kernel-modules kernel-modules-extra \
@@ -465,7 +467,7 @@ sudo chroot "$ROOTFS_DIR" dnf install -y --releasever=43 \
 
 # Remove GNOME packages to save space and avoid conflicts
 echo "  - Removing GNOME packages..."
-sudo chroot "$ROOTFS_DIR" dnf remove -y --releasever=43 --noautoremove \
+sudo chroot "$ROOTFS_DIR" dnf remove -y --releasever=44 --noautoremove \
     gnome-shell gnome-session gnome-tour gnome-initial-setup \
     gdm gnome-control-center gnome-settings-daemon \
     2>&1 | tail -20 || echo "Warning: Some GNOME packages may not be installed"
@@ -476,7 +478,7 @@ sudo chroot "$ROOTFS_DIR" systemctl set-default graphical.target
 
 # Enable SDDM and disable GDM
 echo "  - Enabling SDDM, disabling GDM..."
-sudo chroot "$ROOTFS_DIR" systemctl disable gdm.service 2>/dev/null || true
+sudo chroot "$ROOTFS_DIR" systemctl disable gdm.service plasmalogin.service 2>/dev/null || true
 sudo chroot "$ROOTFS_DIR" systemctl enable sddm.service 2>/dev/null || true
 
 # Create display-manager symlink
@@ -557,12 +559,12 @@ echo "  - KDE Plasma installation complete"
 # ============================================
 
 # Copy Plymouth theme
-if [ -d "$BRANDING_DIR/plymouth/arxisos" ]; then
+if [ -d "$BRANDING_DIR/plymouth/vigilos" ]; then
     echo "  - Plymouth theme"
-    sudo mkdir -p "$ROOTFS_DIR/usr/share/plymouth/themes/arxisos"
-    sudo cp -r "$BRANDING_DIR/plymouth/arxisos/"* "$ROOTFS_DIR/usr/share/plymouth/themes/arxisos/"
+    sudo mkdir -p "$ROOTFS_DIR/usr/share/plymouth/themes/vigilos"
+    sudo cp -r "$BRANDING_DIR/plymouth/vigilos/"* "$ROOTFS_DIR/usr/share/plymouth/themes/vigilos/"
 
-    # Configure Plymouth to use spinner theme with ArxisOS watermark
+    # Configure Plymouth to use spinner theme with VIGILOS watermark
     sudo mkdir -p "$ROOTFS_DIR/etc/plymouth"
     sudo tee "$ROOTFS_DIR/etc/plymouth/plymouthd.conf" > /dev/null << 'PLYMOUTHCONF'
 [Daemon]
@@ -573,16 +575,16 @@ PLYMOUTHCONF
 
     # Get Plymouth watermark - prefer pre-generated 128x128
     PLYMOUTH_LOGO_ROOTFS=""
-    if [ -f "$BRANDING_DIR/logos/arxisos-watermark-128.png" ]; then
-        PLYMOUTH_LOGO_ROOTFS="$BRANDING_DIR/logos/arxisos-watermark-128.png"
+    if [ -f "$BRANDING_DIR/logos/vigilos-watermark-128.png" ]; then
+        PLYMOUTH_LOGO_ROOTFS="$BRANDING_DIR/logos/vigilos-watermark-128.png"
         echo "    Using pre-generated 128x128 watermark"
-    elif [ -f "$BRANDING_DIR/logos/arxisos-logo.png" ]; then
+    elif [ -f "$BRANDING_DIR/logos/vigilos-logo.png" ]; then
         # Fallback: try to resize the original logo
-        PLYMOUTH_LOGO_ROOTFS="/tmp/arxisos-plymouth-logo-rootfs.png"
+        PLYMOUTH_LOGO_ROOTFS="/tmp/vigilos-plymouth-logo-rootfs.png"
         if command -v magick &> /dev/null; then
-            magick "$BRANDING_DIR/logos/arxisos-logo.png" -resize 128x128 -background transparent -gravity center "$PLYMOUTH_LOGO_ROOTFS" 2>/dev/null || PLYMOUTH_LOGO_ROOTFS=""
+            magick "$BRANDING_DIR/logos/vigilos-logo.png" -resize 128x128 -background transparent -gravity center "$PLYMOUTH_LOGO_ROOTFS" 2>/dev/null || PLYMOUTH_LOGO_ROOTFS=""
         elif command -v convert &> /dev/null; then
-            convert "$BRANDING_DIR/logos/arxisos-logo.png" -resize 128x128 -background transparent -gravity center "$PLYMOUTH_LOGO_ROOTFS" 2>/dev/null || PLYMOUTH_LOGO_ROOTFS=""
+            convert "$BRANDING_DIR/logos/vigilos-logo.png" -resize 128x128 -background transparent -gravity center "$PLYMOUTH_LOGO_ROOTFS" 2>/dev/null || PLYMOUTH_LOGO_ROOTFS=""
         else
             PLYMOUTH_LOGO_ROOTFS=""
         fi
@@ -590,7 +592,7 @@ PLYMOUTHCONF
 
     # Only replace if we have a valid watermark
     if [ -n "$PLYMOUTH_LOGO_ROOTFS" ] && [ -f "$PLYMOUTH_LOGO_ROOTFS" ]; then
-        # Replace Fedora watermark with ArxisOS logo in spinner theme
+        # Replace Fedora watermark with VIGILOS logo in spinner theme
         if [ -d "$ROOTFS_DIR/usr/share/plymouth/themes/spinner" ]; then
             sudo cp "$PLYMOUTH_LOGO_ROOTFS" "$ROOTFS_DIR/usr/share/plymouth/themes/spinner/watermark.png" 2>/dev/null || true
             echo "    Replaced spinner watermark"
@@ -602,24 +604,24 @@ PLYMOUTHCONF
             echo "    Replaced bgrt watermark"
         fi
 
-        # Also replace in arxisos theme (used during shutdown)
-        if [ -d "$ROOTFS_DIR/usr/share/plymouth/themes/arxisos" ]; then
-            sudo cp "$PLYMOUTH_LOGO_ROOTFS" "$ROOTFS_DIR/usr/share/plymouth/themes/arxisos/logo.png" 2>/dev/null || true
-            echo "    Replaced arxisos theme logo"
+        # Also replace in vigilos theme (used during shutdown)
+        if [ -d "$ROOTFS_DIR/usr/share/plymouth/themes/vigilos" ]; then
+            sudo cp "$PLYMOUTH_LOGO_ROOTFS" "$ROOTFS_DIR/usr/share/plymouth/themes/vigilos/logo.png" 2>/dev/null || true
+            echo "    Replaced vigilos theme logo"
         fi
 
         # Clean up temp file if we created one
-        [ "$PLYMOUTH_LOGO_ROOTFS" = "/tmp/arxisos-plymouth-logo-rootfs.png" ] && rm -f "$PLYMOUTH_LOGO_ROOTFS"
+        [ "$PLYMOUTH_LOGO_ROOTFS" = "/tmp/vigilos-plymouth-logo-rootfs.png" ] && rm -f "$PLYMOUTH_LOGO_ROOTFS"
     else
         echo "    WARNING: No valid watermark available for rootfs"
     fi
 
-    # Create dracut module to ensure ArxisOS branding is in initramfs for installed system
-    echo "  - Creating dracut module for ArxisOS plymouth branding"
-    sudo mkdir -p "$ROOTFS_DIR/usr/lib/dracut/modules.d/99arxisos-branding"
-    sudo tee "$ROOTFS_DIR/usr/lib/dracut/modules.d/99arxisos-branding/module-setup.sh" > /dev/null << 'DRACUT_MODULE'
+    # Create dracut module to ensure VIGILOS branding is in initramfs for installed system
+    echo "  - Creating dracut module for VIGILOS plymouth branding"
+    sudo mkdir -p "$ROOTFS_DIR/usr/lib/dracut/modules.d/99vigilos-branding"
+    sudo tee "$ROOTFS_DIR/usr/lib/dracut/modules.d/99vigilos-branding/module-setup.sh" > /dev/null << 'DRACUT_MODULE'
 #!/bin/bash
-# ArxisOS Plymouth branding dracut module
+# VIGILOS Plymouth branding dracut module
 
 check() {
     return 0
@@ -631,7 +633,7 @@ depends() {
 }
 
 install() {
-    # Install ArxisOS watermark to spinner theme in initramfs
+    # Install VIGILOS watermark to spinner theme in initramfs
     if [ -f /usr/share/plymouth/themes/spinner/watermark.png ]; then
         inst_simple /usr/share/plymouth/themes/spinner/watermark.png
     fi
@@ -639,30 +641,30 @@ install() {
     if [ -f /usr/share/plymouth/themes/bgrt/watermark.png ]; then
         inst_simple /usr/share/plymouth/themes/bgrt/watermark.png
     fi
-    # Install ArxisOS theme if available
-    if [ -d /usr/share/plymouth/themes/arxisos ]; then
-        inst_dir /usr/share/plymouth/themes/arxisos
-        for f in /usr/share/plymouth/themes/arxisos/*; do
+    # Install VIGILOS theme if available
+    if [ -d /usr/share/plymouth/themes/vigilos ]; then
+        inst_dir /usr/share/plymouth/themes/vigilos
+        for f in /usr/share/plymouth/themes/vigilos/*; do
             inst_simple "$f"
         done
     fi
 }
 DRACUT_MODULE
-    sudo chmod +x "$ROOTFS_DIR/usr/lib/dracut/modules.d/99arxisos-branding/module-setup.sh"
+    sudo chmod +x "$ROOTFS_DIR/usr/lib/dracut/modules.d/99vigilos-branding/module-setup.sh"
 
     # Create dracut configuration to always include the branding module
     sudo mkdir -p "$ROOTFS_DIR/etc/dracut.conf.d"
-    sudo tee "$ROOTFS_DIR/etc/dracut.conf.d/arxisos-branding.conf" > /dev/null << 'DRACUT_CONF'
-# ArxisOS branding - include plymouth watermarks in initramfs
-add_dracutmodules+=" arxisos-branding "
+    sudo tee "$ROOTFS_DIR/etc/dracut.conf.d/vigilos-branding.conf" > /dev/null << 'DRACUT_CONF'
+# VIGILOS branding - include plymouth watermarks in initramfs
+add_dracutmodules+=" vigilos-branding "
 DRACUT_CONF
 fi
 
 # Copy GRUB theme
-if [ -d "$BRANDING_DIR/grub/arxisos" ]; then
+if [ -d "$BRANDING_DIR/grub/vigilos" ]; then
     echo "  - GRUB theme"
-    sudo mkdir -p "$ROOTFS_DIR/boot/grub2/themes/arxisos"
-    sudo cp -r "$BRANDING_DIR/grub/arxisos/"* "$ROOTFS_DIR/boot/grub2/themes/arxisos/"
+    sudo mkdir -p "$ROOTFS_DIR/boot/grub2/themes/vigilos"
+    sudo cp -r "$BRANDING_DIR/grub/vigilos/"* "$ROOTFS_DIR/boot/grub2/themes/vigilos/"
 
     # Generate GRUB font files (.pf2) from system fonts
     echo "  - Generating GRUB fonts for theme..."
@@ -681,15 +683,15 @@ if [ -d "$BRANDING_DIR/grub/arxisos" ]; then
 
         # Generate fonts at various sizes needed by theme
         if [ -n "$DEJAVU_REGULAR" ]; then
-            sudo $GRUB_MKFONT -s 11 -o "$ROOTFS_DIR/boot/grub2/themes/arxisos/dejavu_sans_11.pf2" "$DEJAVU_REGULAR" 2>/dev/null || true
-            sudo $GRUB_MKFONT -s 16 -o "$ROOTFS_DIR/boot/grub2/themes/arxisos/dejavu_sans_16.pf2" "$DEJAVU_REGULAR" 2>/dev/null || true
+            sudo $GRUB_MKFONT -s 11 -o "$ROOTFS_DIR/boot/grub2/themes/vigilos/dejavu_sans_11.pf2" "$DEJAVU_REGULAR" 2>/dev/null || true
+            sudo $GRUB_MKFONT -s 16 -o "$ROOTFS_DIR/boot/grub2/themes/vigilos/dejavu_sans_16.pf2" "$DEJAVU_REGULAR" 2>/dev/null || true
         fi
         if [ -n "$DEJAVU_BOLD" ]; then
-            sudo $GRUB_MKFONT -s 16 -o "$ROOTFS_DIR/boot/grub2/themes/arxisos/dejavu_sans_bold_16.pf2" "$DEJAVU_BOLD" 2>/dev/null || true
-            sudo $GRUB_MKFONT -s 24 -o "$ROOTFS_DIR/boot/grub2/themes/arxisos/dejavu_sans_bold_24.pf2" "$DEJAVU_BOLD" 2>/dev/null || true
+            sudo $GRUB_MKFONT -s 16 -o "$ROOTFS_DIR/boot/grub2/themes/vigilos/dejavu_sans_bold_16.pf2" "$DEJAVU_BOLD" 2>/dev/null || true
+            sudo $GRUB_MKFONT -s 24 -o "$ROOTFS_DIR/boot/grub2/themes/vigilos/dejavu_sans_bold_24.pf2" "$DEJAVU_BOLD" 2>/dev/null || true
         fi
         if [ -n "$DEJAVU_MONO" ]; then
-            sudo $GRUB_MKFONT -s 14 -o "$ROOTFS_DIR/boot/grub2/themes/arxisos/dejavu_mono_14.pf2" "$DEJAVU_MONO" 2>/dev/null || true
+            sudo $GRUB_MKFONT -s 14 -o "$ROOTFS_DIR/boot/grub2/themes/vigilos/dejavu_mono_14.pf2" "$DEJAVU_MONO" 2>/dev/null || true
         fi
         echo "    Font files generated"
     else
@@ -698,13 +700,13 @@ if [ -d "$BRANDING_DIR/grub/arxisos" ]; then
 
     # Copy unicode.pf2 as fallback
     if [ -f /usr/share/grub/unicode.pf2 ]; then
-        sudo cp /usr/share/grub/unicode.pf2 "$ROOTFS_DIR/boot/grub2/themes/arxisos/" 2>/dev/null || true
+        sudo cp /usr/share/grub/unicode.pf2 "$ROOTFS_DIR/boot/grub2/themes/vigilos/" 2>/dev/null || true
     elif [ -f /boot/grub2/fonts/unicode.pf2 ]; then
-        sudo cp /boot/grub2/fonts/unicode.pf2 "$ROOTFS_DIR/boot/grub2/themes/arxisos/" 2>/dev/null || true
+        sudo cp /boot/grub2/fonts/unicode.pf2 "$ROOTFS_DIR/boot/grub2/themes/vigilos/" 2>/dev/null || true
     fi
 
     # Enable GRUB theme in configuration
-    echo "  - Enabling GRUB theme and ArxisOS branding"
+    echo "  - Enabling GRUB theme and VIGILOS branding"
     sudo mkdir -p "$ROOTFS_DIR/etc/default"
     if [ -f "$ROOTFS_DIR/etc/default/grub" ]; then
         # Remove any existing lines we're going to set
@@ -712,12 +714,12 @@ if [ -d "$BRANDING_DIR/grub/arxisos" ]; then
         sudo sed -i '/^GRUB_DISTRIBUTOR=/d' "$ROOTFS_DIR/etc/default/grub"
         sudo sed -i '/^GRUB_DISABLE_OS_PROBER=/d' "$ROOTFS_DIR/etc/default/grub"
     fi
-    # Add GRUB configuration for ArxisOS
+    # Add GRUB configuration for VIGILOS
     sudo tee -a "$ROOTFS_DIR/etc/default/grub" > /dev/null << 'GRUB_DEFAULT_EOF'
 
-# ArxisOS GRUB Configuration
-GRUB_THEME="/boot/grub2/themes/arxisos/theme.txt"
-GRUB_DISTRIBUTOR="ArxisOS"
+# VIGILOS GRUB Configuration
+GRUB_THEME="/boot/grub2/themes/vigilos/theme.txt"
+GRUB_DISTRIBUTOR="VIGIL OS"
 # Disable os-prober to prevent duplicate entries from live media
 GRUB_DISABLE_OS_PROBER=true
 GRUB_DEFAULT_EOF
@@ -725,10 +727,10 @@ GRUB_DEFAULT_EOF
     # Also create a kernel post-install hook to regenerate grub.cfg
     echo "  - Creating kernel post-install hook for GRUB"
     sudo mkdir -p "$ROOTFS_DIR/etc/kernel/postinst.d"
-    sudo tee "$ROOTFS_DIR/etc/kernel/postinst.d/99-update-grub-arxisos" > /dev/null << 'KERNEL_HOOK_EOF'
+    sudo tee "$ROOTFS_DIR/etc/kernel/postinst.d/99-update-grub-vigilos" > /dev/null << 'KERNEL_HOOK_EOF'
 #!/bin/bash
 # Regenerate GRUB config after kernel installation
-# This ensures ArxisOS branding is preserved
+# This ensures VIGILOS branding is preserved
 if [ -x /usr/sbin/grub2-mkconfig ]; then
     /usr/sbin/grub2-mkconfig -o /boot/grub2/grub.cfg 2>/dev/null || true
 fi
@@ -736,56 +738,56 @@ if [ -d /boot/efi/EFI/fedora ] && [ -x /usr/sbin/grub2-mkconfig ]; then
     /usr/sbin/grub2-mkconfig -o /boot/efi/EFI/fedora/grub.cfg 2>/dev/null || true
 fi
 KERNEL_HOOK_EOF
-    sudo chmod +x "$ROOTFS_DIR/etc/kernel/postinst.d/99-update-grub-arxisos"
+    sudo chmod +x "$ROOTFS_DIR/etc/kernel/postinst.d/99-update-grub-vigilos"
 fi
 
-# Copy SDDM theme - prefer new Plasma 6 compatible ArxisOS-SDDM theme
+# Copy SDDM theme - prefer new Plasma 6 compatible VIGILOS-SDDM theme
 SDDM_THEME_SOURCE=""
-if [ -d "$BUILD_DIR/PLASMA-CONFIGS/ArxisOS-SDDM" ]; then
-    SDDM_THEME_SOURCE="$BUILD_DIR/PLASMA-CONFIGS/ArxisOS-SDDM"
+if [ -d "$BUILD_DIR/PLASMA-CONFIGS/VIGILOS-SDDM" ]; then
+    SDDM_THEME_SOURCE="$BUILD_DIR/PLASMA-CONFIGS/VIGILOS-SDDM"
     echo "  - SDDM theme (Plasma 6 version from PLASMA-CONFIGS)"
-elif [ -d "$BRANDING_DIR/sddm/arxisos" ]; then
-    SDDM_THEME_SOURCE="$BRANDING_DIR/sddm/arxisos"
+elif [ -d "$BRANDING_DIR/sddm/vigilos" ]; then
+    SDDM_THEME_SOURCE="$BRANDING_DIR/sddm/vigilos"
     echo "  - SDDM theme (fallback from branding)"
 fi
 
 if [ -n "$SDDM_THEME_SOURCE" ]; then
-    sudo mkdir -p "$ROOTFS_DIR/usr/share/sddm/themes/arxisos"
-    sudo cp -r "$SDDM_THEME_SOURCE/"* "$ROOTFS_DIR/usr/share/sddm/themes/arxisos/"
+    sudo mkdir -p "$ROOTFS_DIR/usr/share/sddm/themes/vigilos"
+    sudo cp -r "$SDDM_THEME_SOURCE/"* "$ROOTFS_DIR/usr/share/sddm/themes/vigilos/"
 
-    # Set ArxisOS logo as default user avatar/face icon
-    if [ -f "$BRANDING_DIR/logos/arxisos-logo.png" ]; then
-        echo "  - Setting ArxisOS logo as default user avatar"
-        sudo mkdir -p "$ROOTFS_DIR/usr/share/sddm/themes/arxisos/faces"
-        sudo cp "$BRANDING_DIR/logos/arxisos-logo.png" "$ROOTFS_DIR/usr/share/sddm/themes/arxisos/faces/.face.icon"
+    # Set VIGILOS logo as default user avatar/face icon
+    if [ -f "$BRANDING_DIR/logos/vigilos-logo.png" ]; then
+        echo "  - Setting VIGILOS logo as default user avatar"
+        sudo mkdir -p "$ROOTFS_DIR/usr/share/sddm/themes/vigilos/faces"
+        sudo cp "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/sddm/themes/vigilos/faces/.face.icon"
         # Also set as default face for all users
         sudo mkdir -p "$ROOTFS_DIR/usr/share/sddm/faces"
-        sudo cp "$BRANDING_DIR/logos/arxisos-logo.png" "$ROOTFS_DIR/usr/share/sddm/faces/.face.icon"
+        sudo cp "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/sddm/faces/.face.icon"
     fi
 fi
 
 # Copy wallpapers
 if [ -d "$BRANDING_DIR/wallpapers" ]; then
     echo "  - Wallpapers"
-    # Copy ArxisOS wallpaper package (proper Plasma wallpaper structure)
-    if [ -d "$BRANDING_DIR/wallpapers/ArxisOS" ]; then
-        sudo mkdir -p "$ROOTFS_DIR/usr/share/wallpapers/ArxisOS"
-        sudo cp -r "$BRANDING_DIR/wallpapers/ArxisOS/"* "$ROOTFS_DIR/usr/share/wallpapers/ArxisOS/"
+    # Copy VIGILOS wallpaper package (proper Plasma wallpaper structure)
+    if [ -d "$BRANDING_DIR/wallpapers/VIGILOS" ]; then
+        sudo mkdir -p "$ROOTFS_DIR/usr/share/wallpapers/VIGILOS"
+        sudo cp -r "$BRANDING_DIR/wallpapers/VIGILOS/"* "$ROOTFS_DIR/usr/share/wallpapers/VIGILOS/"
     fi
     # Also copy standalone wallpapers for compatibility
-    [ -f "$BRANDING_DIR/wallpapers/default.png" ] && sudo cp "$BRANDING_DIR/wallpapers/default.png" "$ROOTFS_DIR/usr/share/wallpapers/ArxisOS.png"
+    [ -f "$BRANDING_DIR/wallpapers/default.png" ] && sudo cp "$BRANDING_DIR/wallpapers/default.png" "$ROOTFS_DIR/usr/share/wallpapers/VIGILOS.png"
 fi
 
 # Copy logos
 if [ -d "$BRANDING_DIR/logos" ]; then
     echo "  - Logos"
-    sudo mkdir -p "$ROOTFS_DIR/usr/share/arxisos/logos"
+    sudo mkdir -p "$ROOTFS_DIR/usr/share/vigilos/logos"
     sudo mkdir -p "$ROOTFS_DIR/usr/share/pixmaps"
-    sudo cp -r "$BRANDING_DIR/logos/"* "$ROOTFS_DIR/usr/share/arxisos/logos/"
-    sudo cp "$BRANDING_DIR/logos/arxisos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/" 2>/dev/null || true
+    sudo cp -r "$BRANDING_DIR/logos/"* "$ROOTFS_DIR/usr/share/vigilos/logos/"
+    sudo cp "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/" 2>/dev/null || true
 fi
 
-# Copy hicolor icons (ArxisOS branding)
+# Copy hicolor icons (VIGILOS branding)
 if [ -d "$BRANDING_DIR/icons/hicolor" ]; then
     echo "  - Hicolor icons"
     sudo mkdir -p "$ROOTFS_DIR/usr/share/icons/hicolor"
@@ -794,11 +796,7 @@ if [ -d "$BRANDING_DIR/icons/hicolor" ]; then
     done
 fi
 
-# Copy Vivid-Glassy-Dark icon theme
-if [ -d "$BRANDING_DIR/icons/Vivid-Glassy-Dark-Icons" ]; then
-    echo "  - Vivid-Glassy-Dark icon theme"
-    sudo cp -r "$BRANDING_DIR/icons/Vivid-Glassy-Dark-Icons" "$ROOTFS_DIR/usr/share/icons/"
-fi
+# Vivid-Glassy-Dark-Icons is absent from branding/icons; Magna-Glassy-Light is the default theme
 
 # Copy Magna-Glassy-Light icon theme (default)
 if [ -d "$BRANDING_DIR/icons/Magna-Glassy-Light-Icons" ]; then
@@ -874,9 +872,9 @@ if [ -d "$SKEL_DIR" ]; then
     [ -d "$SKEL_DIR/.local" ] && sudo cp -r "$SKEL_DIR/.local" "$ROOTFS_DIR/etc/skel/"
     sudo chmod +x "$ROOTFS_DIR/etc/skel/.local/bin/"* 2>/dev/null || true
 
-    # Configure ArxisOS wallpaper as default for Plasma 6
+    # Configure VIGILOS wallpaper as default for Plasma 6
     # Use multiple approaches to ensure wallpaper is applied
-    echo "  - Setting ArxisOS wallpaper as default..."
+    echo "  - Setting VIGILOS wallpaper as default..."
 
     # Method 1: Set in kwinrc (affects lockscreen and splash)
     sudo tee "$ROOTFS_DIR/etc/skel/.config/kwinrc" > /dev/null << 'KWINRC'
@@ -912,18 +910,18 @@ plugin=org.kde.plasma.folder
 wallpaperplugin=org.kde.image
 
 [Containments][1][Wallpaper][org.kde.image][General]
-Image=/usr/share/wallpapers/ArxisOS/
-PreviewImage=/usr/share/wallpapers/ArxisOS/contents/images/3840x2160.png
+Image=/usr/share/wallpapers/VIGILOS/
+PreviewImage=/usr/share/wallpapers/VIGILOS/contents/images/1672x941.png
 SlidePaths=/usr/share/wallpapers/
 PLASMADESKTOP
 
     # Method 4: Set default wallpaper via Plasma globals - this is critical for Plasma 6
-    # Also set ArxisOS as system default wallpaper package
+    # Also set VIGILOS as system default wallpaper package
     sudo mkdir -p "$ROOTFS_DIR/usr/share/plasma/shells/org.kde.plasma.desktop/contents/defaults"
     sudo tee "$ROOTFS_DIR/usr/share/plasma/shells/org.kde.plasma.desktop/contents/defaults/defaults" > /dev/null << 'PLASMA_DEFAULTS'
 [Wallpaper]
-defaultFilePath=/usr/share/wallpapers/ArxisOS/contents/images/3840x2160.png
-defaultWallpaperTheme=ArxisOS
+defaultFilePath=/usr/share/wallpapers/VIGILOS/contents/images/1672x941.png
+defaultWallpaperTheme=VIGILOS
 PLASMA_DEFAULTS
 
     # Method 5: Create plasma defaults configuration
@@ -933,15 +931,15 @@ PLASMA_DEFAULTS
 name=default
 
 [Wallpapers]
-defaultWallpaperTheme=ArxisOS
+defaultWallpaperTheme=VIGILOS
 defaultFileSuffix=.png
-defaultWidth=3840
-defaultHeight=2160
+defaultWidth=1672
+defaultHeight=941
 PLASMARC_DEFAULT
 
-    # Create a symlink to make ArxisOS the next wallpaper if user doesn't have config
-    if [ -d "$ROOTFS_DIR/usr/share/wallpapers/ArxisOS" ]; then
-        sudo ln -sf ArxisOS "$ROOTFS_DIR/usr/share/wallpapers/Next" 2>/dev/null || true
+    # Create a symlink to make VIGILOS the next wallpaper if user doesn't have config
+    if [ -d "$ROOTFS_DIR/usr/share/wallpapers/VIGILOS" ]; then
+        sudo ln -sf VIGILOS "$ROOTFS_DIR/usr/share/wallpapers/Next" 2>/dev/null || true
     fi
 
     # Setup liveuser with defaults
@@ -967,7 +965,7 @@ echo "  - Panel configured via Plasma defaults (no autostart override needed)"
 
 # Update icon cache
 echo "  - Updating icon caches"
-sudo chroot "$ROOTFS_DIR" gtk-update-icon-cache -f /usr/share/icons/Vivid-Glassy-Dark-Icons 2>/dev/null || true
+# (Vivid-Glassy-Dark-Icons cache line removed: theme absent from branding/icons)
 sudo chroot "$ROOTFS_DIR" gtk-update-icon-cache -f /usr/share/icons/Magna-Glassy-Light-Icons 2>/dev/null || true
 sudo chroot "$ROOTFS_DIR" gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
 
@@ -978,13 +976,14 @@ sudo mkdir -p "$ROOTFS_DIR/etc/sddm.conf.d"
 
 # Base SDDM config (theme, session) - NO autologin here
 # Use X11 session for better VM/live environment compatibility
-sudo tee "$ROOTFS_DIR/etc/sddm.conf.d/arxisos.conf" > /dev/null << 'SDDM_EOF'
+sudo tee "$ROOTFS_DIR/etc/sddm.conf.d/vigilos.conf" > /dev/null << 'SDDM_EOF'
 [Theme]
-Current=arxisos
+Current=vigilos
 CursorTheme=oreo_white_cursors
 
 [General]
-DefaultSession=plasmax11.desktop
+DisplayServer=wayland
+DefaultSession=plasma.desktop
 
 [X11]
 ServerArguments=-nolisten tcp
@@ -995,7 +994,7 @@ SDDM_EOF
 
 # Create systemd service to enable autologin ONLY in live session
 # Live sessions have /run/initramfs/live present
-# Use X11 session (plasmax11) for better compatibility in live/VM environments
+# Use X11 session (plasma) for better compatibility in live/VM environments
 echo "  - Creating live-session autologin service"
 sudo tee "$ROOTFS_DIR/etc/systemd/system/sddm-live-autologin.service" > /dev/null << 'LIVE_AUTOLOGIN_EOF'
 [Unit]
@@ -1010,7 +1009,7 @@ ExecStart=/bin/bash -c '\
         mkdir -p /etc/sddm.conf.d; \
         echo "[Autologin]" > /etc/sddm.conf.d/live-autologin.conf; \
         echo "User=liveuser" >> /etc/sddm.conf.d/live-autologin.conf; \
-        echo "Session=plasmax11" >> /etc/sddm.conf.d/live-autologin.conf; \
+        echo "Session=plasma" >> /etc/sddm.conf.d/live-autologin.conf; \
         echo "Relogin=false" >> /etc/sddm.conf.d/live-autologin.conf; \
     fi'
 ExecStop=/bin/rm -f /etc/sddm.conf.d/live-autologin.conf
@@ -1031,12 +1030,12 @@ echo "PREFERRED=plasma" | sudo tee "$ROOTFS_DIR/etc/sysconfig/desktop" > /dev/nu
 echo "  - Configuring live user for Plasma X11 session"
 sudo mkdir -p "$ROOTFS_DIR/var/lib/AccountsService/users"
 # Configure for common live user names
-for liveuser in liveuser live arxis; do
+for liveuser in liveuser live vigilos; do
     sudo tee "$ROOTFS_DIR/var/lib/AccountsService/users/$liveuser" > /dev/null << ACCOUNTSEOF
 [User]
-Session=plasmax11
-XSession=plasmax11
-Icon=/usr/share/pixmaps/arxisos-logo.png
+Session=plasma
+XSession=plasma
+Icon=/usr/share/pixmaps/vigilos-logo.png
 SystemAccount=false
 ACCOUNTSEOF
 done
@@ -1061,7 +1060,7 @@ GDMCONF
 
 # Enable SDDM and disable GDM
 echo "  - Configuring display manager"
-sudo chroot "$ROOTFS_DIR" systemctl disable gdm.service 2>/dev/null || true
+sudo chroot "$ROOTFS_DIR" systemctl disable gdm.service plasmalogin.service 2>/dev/null || true
 sudo chroot "$ROOTFS_DIR" systemctl enable sddm.service 2>/dev/null || true
 sudo rm -f "$ROOTFS_DIR/etc/systemd/system/display-manager.service" 2>/dev/null || true
 sudo ln -sf /usr/lib/systemd/system/sddm.service "$ROOTFS_DIR/etc/systemd/system/display-manager.service" 2>/dev/null || true
@@ -1079,9 +1078,9 @@ echo "  - Setting Plasma as default session"
 sudo mkdir -p "$ROOTFS_DIR/usr/share/xsessions"
 sudo mkdir -p "$ROOTFS_DIR/usr/share/wayland-sessions"
 
-# For X11 sessions - use plasmax11 for stability
-if [ -f "$ROOTFS_DIR/usr/share/xsessions/plasmax11.desktop" ]; then
-    sudo ln -sf plasmax11.desktop "$ROOTFS_DIR/usr/share/xsessions/default.desktop" 2>/dev/null || true
+# For X11 sessions - use plasma for stability
+if [ -f "$ROOTFS_DIR/usr/share/xsessions/plasma.desktop" ]; then
+    sudo ln -sf plasma.desktop "$ROOTFS_DIR/usr/share/xsessions/default.desktop" 2>/dev/null || true
 elif [ -f "$ROOTFS_DIR/usr/share/xsessions/plasma.desktop" ]; then
     sudo ln -sf plasma.desktop "$ROOTFS_DIR/usr/share/xsessions/default.desktop" 2>/dev/null || true
 fi
@@ -1091,8 +1090,8 @@ sudo mkdir -p "$ROOTFS_DIR/var/lib/AccountsService/users"
 # Default template for new users to use Plasma X11
 sudo tee "$ROOTFS_DIR/var/lib/AccountsService/users/liveuser" > /dev/null << 'ACCT_EOF'
 [User]
-Session=plasmax11
-XSession=plasmax11
+Session=plasma
+XSession=plasma
 Icon=/usr/share/sddm/faces/.face.icon
 ACCT_EOF
 
@@ -1119,7 +1118,7 @@ sudo rm -f "$ROOTFS_DIR/usr/share/applications/gnome-initial-setup.desktop" 2>/d
 sudo rm -rf "$ROOTFS_DIR/etc/xdg/autostart/org.gnome."* 2>/dev/null || true
 
 # Install start.svg as the application menu icon (start-here, distributor-logo)
-echo "  - Replacing Fedora icons with ArxisOS icons"
+echo "  - Replacing Fedora icons with VIGILOS icons"
 if [ -f "$BRANDING_DIR/start.svg" ]; then
     echo "    - Installing start.svg as application menu icon..."
 
@@ -1127,7 +1126,7 @@ if [ -f "$BRANDING_DIR/start.svg" ]; then
     sudo mkdir -p "$ROOTFS_DIR/usr/share/icons/hicolor/scalable/apps"
     sudo cp "$BRANDING_DIR/start.svg" "$ROOTFS_DIR/usr/share/icons/hicolor/scalable/apps/start-here.svg"
     sudo cp "$BRANDING_DIR/start.svg" "$ROOTFS_DIR/usr/share/icons/hicolor/scalable/apps/distributor-logo.svg"
-    sudo cp "$BRANDING_DIR/start.svg" "$ROOTFS_DIR/usr/share/icons/hicolor/scalable/apps/arxisos-start.svg"
+    sudo cp "$BRANDING_DIR/start.svg" "$ROOTFS_DIR/usr/share/icons/hicolor/scalable/apps/vigilos-start.svg"
 
     # Generate PNG versions from start.svg for different sizes
     if command -v convert &> /dev/null || command -v magick &> /dev/null; then
@@ -1140,19 +1139,19 @@ if [ -f "$BRANDING_DIR/start.svg" ]; then
             echo "      - Generating ${size}x${size} icons from start.svg..."
             sudo $CONVERT_CMD -background none "$BRANDING_DIR/start.svg" -resize ${size}x${size} "$ICON_DIR/start-here.png" 2>/dev/null || true
             sudo cp "$ICON_DIR/start-here.png" "$ICON_DIR/distributor-logo.png" 2>/dev/null || true
-            sudo cp "$ICON_DIR/start-here.png" "$ICON_DIR/arxisos-start.png" 2>/dev/null || true
+            sudo cp "$ICON_DIR/start-here.png" "$ICON_DIR/vigilos-start.png" 2>/dev/null || true
         done
     fi
 
     # Copy to pixmaps
     sudo cp "$BRANDING_DIR/start.svg" "$ROOTFS_DIR/usr/share/pixmaps/start-here.svg" 2>/dev/null || true
     sudo cp "$BRANDING_DIR/start.svg" "$ROOTFS_DIR/usr/share/pixmaps/distributor-logo.svg" 2>/dev/null || true
-    sudo cp "$BRANDING_DIR/start.svg" "$ROOTFS_DIR/usr/share/pixmaps/arxisos-start.svg" 2>/dev/null || true
+    sudo cp "$BRANDING_DIR/start.svg" "$ROOTFS_DIR/usr/share/pixmaps/vigilos-start.svg" 2>/dev/null || true
 fi
 
-# Install arxisos-logo.png for other branding (fedora replacements)
-if [ -f "$BRANDING_DIR/logos/arxisos-logo.png" ]; then
-    echo "    - Installing arxisos-logo.png for system branding..."
+# Install vigilos-logo.png for other branding (fedora replacements)
+if [ -f "$BRANDING_DIR/logos/vigilos-logo.png" ]; then
+    echo "    - Installing vigilos-logo.png for system branding..."
 
     # Replace fedora-logo icons in various sizes
     for size in 16 22 24 32 48 64 96 128 256 512; do
@@ -1161,30 +1160,30 @@ if [ -f "$BRANDING_DIR/logos/arxisos-logo.png" ]; then
             if command -v convert &> /dev/null || command -v magick &> /dev/null; then
                 CONVERT_CMD="convert"
                 command -v magick &> /dev/null && CONVERT_CMD="magick"
-                sudo $CONVERT_CMD "$BRANDING_DIR/logos/arxisos-logo.png" -resize ${size}x${size} "$ICON_DIR/fedora-logo-icon.png" 2>/dev/null || true
+                sudo $CONVERT_CMD "$BRANDING_DIR/logos/vigilos-logo.png" -resize ${size}x${size} "$ICON_DIR/fedora-logo-icon.png" 2>/dev/null || true
                 sudo cp "$ICON_DIR/fedora-logo-icon.png" "$ICON_DIR/fedora-logo-small.png" 2>/dev/null || true
-                sudo cp "$ICON_DIR/fedora-logo-icon.png" "$ICON_DIR/arxisos-logo.png" 2>/dev/null || true
+                sudo cp "$ICON_DIR/fedora-logo-icon.png" "$ICON_DIR/vigilos-logo.png" 2>/dev/null || true
             fi
         fi
     done
 
     # Also replace in pixmaps
-    sudo cp "$BRANDING_DIR/logos/arxisos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/fedora-logo.png" 2>/dev/null || true
-    sudo cp "$BRANDING_DIR/logos/arxisos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/fedora-logo-small.png" 2>/dev/null || true
-    sudo cp "$BRANDING_DIR/logos/arxisos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/fedora-gdm-logo.png" 2>/dev/null || true
-    sudo cp "$BRANDING_DIR/logos/arxisos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/system-logo-white.png" 2>/dev/null || true
-    sudo cp "$BRANDING_DIR/logos/arxisos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/arxisos-logo.png" 2>/dev/null || true
+    sudo cp "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/fedora-logo.png" 2>/dev/null || true
+    sudo cp "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/fedora-logo-small.png" 2>/dev/null || true
+    sudo cp "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/fedora-gdm-logo.png" 2>/dev/null || true
+    sudo cp "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/system-logo-white.png" 2>/dev/null || true
+    sudo cp "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/vigilos-logo.png" 2>/dev/null || true
 fi
 
-# Create ArxisOS installer desktop shortcut
-echo "  - Creating ArxisOS installer shortcut"
+# Create VIGILOS installer desktop shortcut
+echo "  - Creating VIGILOS installer shortcut"
 sudo mkdir -p "$ROOTFS_DIR/usr/share/applications"
-sudo tee "$ROOTFS_DIR/usr/share/applications/arxisos-installer.desktop" > /dev/null << 'INSTALLER_EOF'
+sudo tee "$ROOTFS_DIR/usr/share/applications/vigilos-installer.desktop" > /dev/null << 'INSTALLER_EOF'
 [Desktop Entry]
-Name=Install ArxisOS
-Comment=Install ArxisOS to your hard drive
+Name=Install VIGIL OS
+Comment=Install VIGIL OS to your hard drive
 Exec=/usr/bin/liveinst
-Icon=arxisos-start
+Icon=vigilos-start
 Terminal=false
 Type=Application
 Categories=System;
@@ -1194,17 +1193,17 @@ INSTALLER_EOF
 
 # Create desktop shortcut for live user
 sudo mkdir -p "$ROOTFS_DIR/etc/skel/Desktop"
-sudo cp "$ROOTFS_DIR/usr/share/applications/arxisos-installer.desktop" "$ROOTFS_DIR/etc/skel/Desktop/"
-sudo chmod +x "$ROOTFS_DIR/etc/skel/Desktop/arxisos-installer.desktop"
+sudo cp "$ROOTFS_DIR/usr/share/applications/vigilos-installer.desktop" "$ROOTFS_DIR/etc/skel/Desktop/"
+sudo chmod +x "$ROOTFS_DIR/etc/skel/Desktop/vigilos-installer.desktop"
 
 # Also add to autostart for live session (shows on desktop)
 sudo mkdir -p "$ROOTFS_DIR/etc/xdg/autostart"
-sudo tee "$ROOTFS_DIR/etc/xdg/autostart/arxisos-installer-autostart.desktop" > /dev/null << 'AUTOSTART_EOF'
+sudo tee "$ROOTFS_DIR/etc/xdg/autostart/vigilos-installer-autostart.desktop" > /dev/null << 'AUTOSTART_EOF'
 [Desktop Entry]
-Name=Install ArxisOS
-Comment=Install ArxisOS to your hard drive
-Exec=/usr/bin/cp /usr/share/applications/arxisos-installer.desktop ~/Desktop/ 2>/dev/null; chmod +x ~/Desktop/arxisos-installer.desktop 2>/dev/null
-Icon=arxisos-start
+Name=Install VIGIL OS
+Comment=Install VIGIL OS to your hard drive
+Exec=/usr/bin/cp /usr/share/applications/vigilos-installer.desktop ~/Desktop/ 2>/dev/null; chmod +x ~/Desktop/vigilos-installer.desktop 2>/dev/null
+Icon=vigilos-start
 Terminal=false
 Type=Application
 X-GNOME-Autostart-enabled=true
@@ -1214,8 +1213,8 @@ AUTOSTART_EOF
 # Copy fastfetch logo
 if [ -f "$BRANDING_DIR/fastfetch/fastfetch-logo.txt" ]; then
     echo "  - Fastfetch logo"
-    sudo mkdir -p "$ROOTFS_DIR/usr/share/arxisos/logos"
-    sudo cp "$BRANDING_DIR/fastfetch/fastfetch-logo.txt" "$ROOTFS_DIR/usr/share/arxisos/logos/"
+    sudo mkdir -p "$ROOTFS_DIR/usr/share/vigilos/logos"
+    sudo cp "$BRANDING_DIR/fastfetch/fastfetch-logo.txt" "$ROOTFS_DIR/usr/share/vigilos/logos/"
 fi
 
 # Apply OS branding
@@ -1224,91 +1223,93 @@ echo "  - OS release info"
 # it there or tooling still reports "Fedora". /etc/os-release symlinks to it.
 sudo mkdir -p "$ROOTFS_DIR/usr/lib"
 sudo tee "$ROOTFS_DIR/usr/lib/os-release" > /dev/null << 'EOF'
-NAME="ArxisOS"
+NAME="VIGIL OS"
 VERSION="1.2 (Loopback)"
-ID=arxisos
+ID=vigilos
 ID_LIKE=fedora
 VERSION_ID=1.2
 VERSION_CODENAME=loopback
-PRETTY_NAME="ArxisOS 1.2 (Loopback)"
+PRETTY_NAME="VIGIL OS 1.2 (Loopback)"
 ANSI_COLOR="0;38;2;129;212;250"
-LOGO=arxisos-logo
-CPE_NAME="cpe:/o:arxisos:arxisos:1.2"
+LOGO=vigilos-logo
+CPE_NAME="cpe:/o:vigilos:vigilos:1.2"
 VARIANT="KDE Plasma"
 VARIANT_ID=kde
-HOME_URL="https://arxisos.com"
-DOCUMENTATION_URL="https://docs.arxisos.com"
-SUPPORT_URL="https://support.arxisos.com"
-BUG_REPORT_URL="https://github.com/arxisos/arxisos/issues"
-PRIVACY_POLICY_URL="https://arxisos.com/privacy"
+HOME_URL="https://vigilglm.ai"
+DOCUMENTATION_URL="https://docs.vigilglm.ai"
+SUPPORT_URL="https://support.vigilglm.ai"
+BUG_REPORT_URL="https://github.com/vigilglm/vigilos/issues"
+PRIVACY_POLICY_URL="https://vigilglm.ai/privacy"
 DEVELOPER="Brad Heffernan"
 EOF
 sudo ln -sf ../usr/lib/os-release "$ROOTFS_DIR/etc/os-release"
 
-echo "ArxisOS release 1.2 (Loopback)" | sudo tee "$ROOTFS_DIR/etc/system-release" > /dev/null
-echo "ArxisOS release 1.2 (Loopback)" | sudo tee "$ROOTFS_DIR/etc/arxisos-release" > /dev/null
+echo "VIGIL OS release 1.2 (Loopback)" | sudo tee "$ROOTFS_DIR/etc/system-release" > /dev/null
+echo "VIGIL OS release 1.2 (Loopback)" | sudo tee "$ROOTFS_DIR/etc/vigilos-release" > /dev/null
 
 # Console login banners
-printf 'ArxisOS 1.2 (Loopback) \\r (\\l)\n\n' | sudo tee "$ROOTFS_DIR/etc/issue" > /dev/null
-printf 'ArxisOS 1.2 (Loopback)\n' | sudo tee "$ROOTFS_DIR/etc/issue.net" > /dev/null
+printf 'VIGIL OS 1.2 (Loopback) \\r (\\l)\n\n' | sudo tee "$ROOTFS_DIR/etc/issue" > /dev/null
+printf 'VIGIL OS 1.2 (Loopback)\n' | sudo tee "$ROOTFS_DIR/etc/issue.net" > /dev/null
 
 # Create lsb-release
 sudo tee "$ROOTFS_DIR/etc/lsb-release" > /dev/null << 'EOF'
-DISTRIB_ID=ArxisOS
+DISTRIB_ID="VIGIL OS"
 DISTRIB_RELEASE=1.2
 DISTRIB_CODENAME=loopback
-DISTRIB_DESCRIPTION="ArxisOS 1.2 (Loopback)"
+DISTRIB_DESCRIPTION="VIGIL OS 1.2 (Loopback)"
 DISTRIB_DEVELOPER="Brad Heffernan"
 EOF
 
-# Anaconda installer profile (bootloader-install fix). Rebranding ID=arxisos
+# Anaconda installer profile (bootloader-install fix). Rebranding ID=vigilos
 # stops Anaconda matching a stock profile, so it falls back to efi_dir="default"
 # and gen_grub_cfgstub fails (EFI/default missing; shim is in EFI/fedora). Ship an
-# arxisos profile inheriting fedora so efi_dir=fedora and the GRUB stub installs.
+# vigilos profile inheriting fedora so efi_dir=fedora and the GRUB stub installs.
 sudo mkdir -p "$ROOTFS_DIR/etc/anaconda/profile.d"
-sudo tee "$ROOTFS_DIR/etc/anaconda/profile.d/arxisos.conf" > /dev/null << 'EOF'
+sudo tee "$ROOTFS_DIR/etc/anaconda/profile.d/vigilos.conf" > /dev/null << 'EOF'
 [Profile]
-profile_id = arxisos
+profile_id = vigilos
 base_profile = fedora
 
 [Profile Detection]
-os_id = arxisos
+os_id = vigilos
+[User Interface]
+webui_web_engine = /usr/local/libexec/vigilos-anaconda-browser
 EOF
 
 # Create first-boot service to finalize GRUB, Plymouth, and system configuration
 echo "  - Creating first-boot setup service"
-sudo tee "$ROOTFS_DIR/etc/systemd/system/arxisos-first-boot.service" > /dev/null << 'FIRSTBOOT_EOF'
+sudo tee "$ROOTFS_DIR/etc/systemd/system/vigilos-first-boot.service" > /dev/null << 'FIRSTBOOT_EOF'
 [Unit]
-Description=ArxisOS First Boot Setup
+Description=VIGILOS First Boot Setup
 After=local-fs.target network.target
-ConditionPathExists=!/var/lib/arxisos-first-boot-done
+ConditionPathExists=!/var/lib/vigilos-first-boot-done
 
 [Service]
 Type=oneshot
 ExecStart=/bin/bash -c '\
     # Only run on installed system (not live) \
     if [ ! -d /run/initramfs/live ] && ! grep -q "root=live:" /proc/cmdline 2>/dev/null; then \
-        echo "ArxisOS: Running first boot setup..."; \
+        echo "VIGILOS: Running first boot setup..."; \
         \
         # Copy GRUB theme to EFI partition if needed \
-        if [ -d /boot/efi/EFI/fedora ] && [ -d /boot/grub2/themes/arxisos ]; then \
+        if [ -d /boot/efi/EFI/fedora ] && [ -d /boot/grub2/themes/vigilos ]; then \
             mkdir -p /boot/efi/EFI/fedora/themes; \
-            cp -r /boot/grub2/themes/arxisos /boot/efi/EFI/fedora/themes/ 2>/dev/null || true; \
-            echo "ArxisOS: GRUB theme copied to EFI partition"; \
+            cp -r /boot/grub2/themes/vigilos /boot/efi/EFI/fedora/themes/ 2>/dev/null || true; \
+            echo "VIGILOS: GRUB theme copied to EFI partition"; \
         fi; \
         \
-        # Regenerate GRUB config with ArxisOS theme \
+        # Regenerate GRUB config with VIGILOS theme \
         grub2-mkconfig -o /boot/grub2/grub.cfg 2>/dev/null || true; \
         if [ -d /boot/efi/EFI/fedora ]; then \
             grub2-mkconfig -o /boot/efi/EFI/fedora/grub.cfg 2>/dev/null || true; \
         fi; \
-        echo "ArxisOS: GRUB config regenerated"; \
+        echo "VIGILOS: GRUB config regenerated"; \
         \
-        # Rebuild initramfs to include ArxisOS plymouth branding \
+        # Rebuild initramfs to include VIGILOS plymouth branding \
         KERNEL_VER=$(uname -r); \
         if [ -f /boot/vmlinuz-$KERNEL_VER ]; then \
             dracut -f /boot/initramfs-$KERNEL_VER.img $KERNEL_VER 2>/dev/null || true; \
-            echo "ArxisOS: Initramfs rebuilt with branding"; \
+            echo "VIGILOS: Initramfs rebuilt with branding"; \
         fi; \
         \
         # Remove liveuser account (only on installed system) \
@@ -1316,7 +1317,7 @@ ExecStart=/bin/bash -c '\
             userdel -r liveuser 2>/dev/null || true; \
             rm -f /etc/sudoers.d/liveuser 2>/dev/null || true; \
             rm -f /var/lib/AccountsService/users/liveuser 2>/dev/null || true; \
-            echo "ArxisOS: Liveuser removed"; \
+            echo "VIGILOS: Liveuser removed"; \
         fi; \
         \
         # Set default avatar and session for all users \
@@ -1330,8 +1331,8 @@ ExecStart=/bin/bash -c '\
                 mkdir -p /var/lib/AccountsService/users; \
                 if [ ! -f "/var/lib/AccountsService/users/$username" ]; then \
                     echo "[User]" > "/var/lib/AccountsService/users/$username"; \
-                    echo "Session=plasmax11" >> "/var/lib/AccountsService/users/$username"; \
-                    echo "XSession=plasmax11" >> "/var/lib/AccountsService/users/$username"; \
+                    echo "Session=plasma" >> "/var/lib/AccountsService/users/$username"; \
+                    echo "XSession=plasma" >> "/var/lib/AccountsService/users/$username"; \
                     echo "Icon=$user_home/.face.icon" >> "/var/lib/AccountsService/users/$username"; \
                 fi; \
             fi; \
@@ -1341,24 +1342,24 @@ ExecStart=/bin/bash -c '\
         restorecon -R /boot 2>/dev/null || true; \
         restorecon -R /var/lib/AccountsService 2>/dev/null || true; \
         \
-        echo "ArxisOS: First boot setup complete"; \
+        echo "VIGILOS: First boot setup complete"; \
     fi'
-ExecStartPost=/bin/touch /var/lib/arxisos-first-boot-done
+ExecStartPost=/bin/touch /var/lib/vigilos-first-boot-done
 RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target
 FIRSTBOOT_EOF
 
-sudo chroot "$ROOTFS_DIR" systemctl enable arxisos-first-boot.service 2>/dev/null || true
+sudo chroot "$ROOTFS_DIR" systemctl enable vigilos-first-boot.service 2>/dev/null || true
 
 # Also create symlink manually as backup (in case chroot systemctl fails)
 sudo mkdir -p "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants"
-sudo ln -sf /etc/systemd/system/arxisos-first-boot.service "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants/arxisos-first-boot.service" 2>/dev/null || true
+sudo ln -sf /etc/systemd/system/vigilos-first-boot.service "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants/vigilos-first-boot.service" 2>/dev/null || true
 
 # IMPORTANT: Set dnf releasever so package updates work after installation
 # This overrides the os-release VERSION_ID for dnf purposes only
-echo "  - Setting dnf releasever for Fedora 43 repos"
+echo "  - Setting dnf releasever for Fedora 44 repos"
 sudo mkdir -p "$ROOTFS_DIR/etc/dnf/vars"
 echo "43" | sudo tee "$ROOTFS_DIR/etc/dnf/vars/releasever" > /dev/null
 

@@ -1,13 +1,18 @@
 # .bashrc
 
-. ~/.git-prompt.bash
+# If not running interactively, don't do anything.
+[[ $- != *i* ]] && return
+
+# Git prompt support is optional in a fresh account.
+if [[ -r "$HOME/.git-prompt.bash" ]]; then
+    . "$HOME/.git-prompt.bash"
+fi
 
 precmd() {
-    echo `git_prompt_precmd`
+    if declare -F git_prompt_precmd >/dev/null; then
+        git_prompt_precmd
+    fi
 }
-
-# If not running interactively, don't do anything
-[[ $- != *i* ]] && return
 
 export HISTCONTROL=ignoreboth:erasedups
 
@@ -88,7 +93,7 @@ if [ -d ~/.bashrc.d ]; then
         fi
     done
 fi
-clear && hfetch
-export EDITOR=nvim
-export VISUALEDITOR=nvim
+[[ "${VIGIL_FETCH_ON_START:-0}" != 1 ]] || hfetch
+export EDITOR=vim
+export VISUAL=vim
 unset rc

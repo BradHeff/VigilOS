@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Anaconda supports an arbitrary unprivileged WebUI browser command.
+# Use a temporary Brave app profile; retain Chromium's normal sandbox.
+set -euo pipefail
+(( EUID != 0 )) || { echo 'Installer browser must run as the desktop user' >&2; exit 1; }
+[[ $# == 1 && "$1" == http://127.0.0.1/cockpit/@localhost/anaconda-webui/index.html* ]] || {
+    echo 'Unexpected local installer URL' >&2; exit 1;
+}
+: "${XDG_RUNTIME_DIR:?Desktop runtime directory required}"
+profile=$(mktemp -d "$XDG_RUNTIME_DIR/vigilos-installer-brave.XXXXXXXX")
+cleanup() { rm -rf -- "$profile"; }
+trap cleanup EXIT
+# This disposable installer profile never sends product analytics. No normal user
+# profile or browser policy is changed (Brave components/p3a/pref_names.h).
+printf '%s\n' '{"brave":{"p3a":{"enabled":false,"notice_acknowledged":true}}}' >"$profile/Local State"
+/usr/bin/brave-browser --user-data-dir="$profile" --no-first-run \
+    --no-default-browser-check --start-maximized --ozone-platform=wayland --app="$1"

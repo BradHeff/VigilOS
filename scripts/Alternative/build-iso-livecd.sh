@@ -1,12 +1,14 @@
 #!/bin/bash
 set -euo pipefail
+echo "ERROR: Alternative build route is not approved for this isolated first pass." >&2
+exit 1
 
-BUILD_DIR="/home/bheffernan/arxisos-build"
+BUILD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CACHE_DIR="/var/cache/live"
 VERSION="1.2"
 ARCH="x86_64"
-ISO_NAME="ArxisOS-$VERSION-$ARCH.iso"
-LOG_FILE="/tmp/arxisos-build.log"
+ISO_NAME="VIGILOS-$VERSION-$ARCH.iso"
+LOG_FILE="/tmp/vigilos-build.log"
 
 cleanup() {
     local exit_code=$?
@@ -25,8 +27,8 @@ cleanup() {
 
 trap cleanup EXIT
 
-echo "=== ArxisOS Build Script (livecd-creator) ==="
-echo "Building ArxisOS $VERSION"
+echo "=== VIGILOS Build Script (livecd-creator) ==="
+echo "Building VIGILOS $VERSION"
 echo "Started: $(date)"
 echo ""
 
@@ -42,13 +44,13 @@ cd "$BUILD_DIR"
 sudo rm -f "$LOG_FILE"
 sudo bash -c "livecd-creator \
     --verbose \
-    --config=\"$BUILD_DIR/kickstarts/arxisos-kde.ks\" \
-    --fslabel=\"ArxisOS-$VERSION\" \
+    --config=\"$BUILD_DIR/kickstarts/vigilos-kde.ks\" \
+    --fslabel=\"VIGILOS-$VERSION\" \
     --cache=\"$CACHE_DIR\" \
     2>&1 | tee \"$LOG_FILE\""
 
 # Find and rename the ISO
-CREATED_ISO=$(ls -1 ArxisOS-*.iso 2>/dev/null | head -1)
+CREATED_ISO=$(ls -1 VIGILOS-*.iso 2>/dev/null | head -1)
 if [ -z "$CREATED_ISO" ]; then
     echo "ERROR: ISO file was not created!"
     exit 1

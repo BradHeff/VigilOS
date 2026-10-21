@@ -1,4 +1,4 @@
-# ArxisOS Build - Git Ignore
+# VIGILOS Build - Git Ignore
 
 # Claude Code configuration
 .claude/
@@ -13,7 +13,7 @@ Theme/
 *.iso
 
 # Temporary build directories
-/var/tmp/arxisos-remaster/
+/var/tmp/vigilos-remaster/
 
 # Screenshots and temporary images
 *.png

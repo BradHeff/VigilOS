@@ -1,9 +1,0 @@
-[org.kde.kdecoration2]
-library=org.kde.kwin.aurorae
-theme=__aurorae__svg__PurPurDayBlur-Aurorae-6
-
-[DesktopSwitcher]
-LayoutName=org.kde.breeze.desktop
-
-[WindowSwitcher]
-LayoutName=org.kde.breeze.desktop

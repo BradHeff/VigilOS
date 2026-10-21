@@ -1,8 +1,10 @@
+> **Isolated development candidate:** Source validation and development RPM builds have passed; ISO/VM acceptance testing is in progress. Read docs/ISOLATED-TEST-PLAN.md and the lab evidence for actual results. Historical release/test statements below describe prior work. The current first pass uses official Fedora repositories, defers automatic third-party drivers/apps, and retains RPM/DNF5 updates. VpM remains a design proposal. The relettered city wallpaper is native 1672×941; larger build exports are upscaled derivatives.
+
 <p align="center">
-  <img src="branding/logos/arxisos-logo.png" alt="ArxisOS Logo" width="200"/>
+  <img src="branding/logos/vigilos-logo.png" alt="VIGILOS Logo" width="200"/>
 </p>
 
-<h1 align="center">ArxisOS</h1>
+<h1 align="center">VIGIL OS</h1>
 
 <p align="center">
   <strong>A Modern, Elegant Linux Distribution Built for Performance and Beauty</strong>
@@ -19,7 +21,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.2-blue?style=for-the-badge" alt="Version"/>
-  <img src="https://img.shields.io/badge/base-Fedora%2043-51A2DA?style=for-the-badge" alt="Base"/>
+  <img src="https://img.shields.io/badge/base-Fedora%2044-51A2DA?style=for-the-badge" alt="Base"/>
   <img src="https://img.shields.io/badge/desktop-KDE%20Plasma%206-1D99F3?style=for-the-badge" alt="Desktop"/>
   <img src="https://img.shields.io/badge/license-GPL--3.0-green?style=for-the-badge" alt="License"/>
 </p>
@@ -28,11 +30,11 @@
 
 ## Overview
 
-**ArxisOS 1.2 "Loopback"** is a Linux distribution based on Fedora 43, featuring the KDE Plasma 6 desktop environment. Built for IT engineers and power users, it pairs the stability and security of Fedora with a cohesive custom visual identity and a sensible default toolset.
+**VIGIL OS 1.2 "Loopback"** is a Linux distribution based on Fedora 44, featuring the KDE Plasma 6 desktop environment. Built for IT engineers and power users, it pairs the stability and security of Fedora with a cohesive custom visual identity and a sensible default toolset.
 
-Whether you're a sysadmin, network engineer, developer, or power user, ArxisOS provides a polished, cohesive experience right out of the box.
+Whether you're a sysadmin, network engineer, developer, or power user, VIGILOS provides a polished, cohesive experience right out of the box.
 
-> **Release codename:** `Loopback` (`VERSION_CODENAME=loopback`). Current release: **ArxisOS 1.2 "Loopback"** (first stable was 1.0). The codename stays `Loopback` across point releases.
+> **Release codename:** `Loopback` (`VERSION_CODENAME=loopback`). Current development candidate: **VIGIL OS 1.2 "Loopback"**. Prior stable-release claims are historical and do not certify this candidate. The codename stays `Loopback` across point releases.
 
 ---
 
@@ -42,22 +44,22 @@ Whether you're a sysadmin, network engineer, developer, or power user, ArxisOS p
 
 | Feature | Description |
 |---------|-------------|
-| **KDE Plasma 6** | The latest Plasma desktop with Wayland and X11 support |
+| **KDE Plasma 6** | KDE Plasma Wayland flagship; X11 is not part of the acceptance claim |
 | **PurPurDay Theme** | Custom global theme with matching colors, icons, and decorations |
 | **Magna-Glassy Icons** | Beautiful glassy icon theme for a modern look |
 | **Oreo Cursors** | Elegant white cursor theme |
-| **Custom Plymouth** | ArxisOS branded boot splash |
-| **SDDM Theme** | Matching login screen with ArxisOS branding |
+| **Custom Plymouth** | VIGILOS branded boot splash |
+| **SDDM Theme** | Matching login screen with VIGILOS branding |
 | **GRUB Theme** | Custom bootloader theme |
 
 ### System Features
 
-- **Fedora 43 Base** — Latest packages, cutting-edge kernel, and excellent hardware support
-- **SELinux** — Ships in *permissive* mode for a smooth first boot; switch to enforcing with `sudo setenforce 1` and set `SELINUX=enforcing` in `/etc/selinux/config` once the system is stable
-- **Flatpak Ready** — Access to thousands of applications via Flathub
+- **Fedora 44 Base** — Latest packages, cutting-edge kernel, and excellent hardware support
+- **SELinux** — Live and installed boots retain enforcing mode. The upstream live installer temporarily relaxes enforcement while installing and restores it on normal exit.
+- **Flatpak** — Available for user-managed applications; this official-repositories-first candidate does not automatically install Flathub applications.
 - **DNF Package Manager** — Fast, reliable package management
 - **Systemd** — Modern init system with excellent service management
-- **ext4 by default** — Reliable default filesystem (choose Btrfs/LVM/XFS manually in the Anaconda installer if preferred)
+- **Storage** — The actual guided Anaconda install uses Btrfs for root/home, ext4 for /boot, and a FAT EFI partition on UEFI.
 
 ### Pre-installed Applications
 
@@ -66,7 +68,7 @@ Whether you're a sysadmin, network engineer, developer, or power user, ArxisOS p
 | **Web** | Firefox |
 | **Office** | LibreOffice Suite |
 | **Files** | Dolphin File Manager |
-| **Terminal** | Konsole with custom ArxisOS profile |
+| **Terminal** | Konsole with custom VIGILOS profile |
 | **Text Editor** | Kate |
 | **Images** | Gwenview |
 | **Documents** | Okular |
@@ -79,43 +81,7 @@ Whether you're a sysadmin, network engineer, developer, or power user, ArxisOS p
 
 ## Screenshots
 
-### Boot Experience
-
-<p align="center">
-  <img src="Screenshots/Screenshot_0.png" alt="ArxisOS GRUB Bootloader" width="800"/>
-</p>
-
-<p align="center">
-  <em>GRUB Bootloader — Custom ArxisOS themed boot menu with sleek dark design</em>
-</p>
-
-### Desktop & Welcome Experience
-
-<p align="center">
-  <img src="Screenshots/Screenshot_1.png" alt="ArxisOS Desktop" width="800"/>
-</p>
-
-<p align="center">
-  <em>ArxisOS Desktop — KDE Plasma 6 with PurPurDay theme, Welcome dialogs, and stunning cityscape wallpaper</em>
-</p>
-
-### Installation Process
-
-<p align="center">
-  <img src="Screenshots/Screenshot_2.png" alt="ArxisOS Installer - Language Selection" width="800"/>
-</p>
-
-<p align="center">
-  <em>Anaconda Installer — Language and keyboard layout selection with ArxisOS branding</em>
-</p>
-
-<p align="center">
-  <img src="Screenshots/Screenshot_3.png" alt="ArxisOS Installer - Installation Progress" width="800"/>
-</p>
-
-<p align="center">
-  <em>Installation Progress — Clean, modern interface showing software installation status</em>
-</p>
+> Screenshots pending: real captures of the GRUB menu, Plasma desktop, and Anaconda installer will be added here (see CLAUDE.md open follow-ups).
 
 ---
 
@@ -147,37 +113,28 @@ Whether you're a sysadmin, network engineer, developer, or power user, ArxisOS p
 
 ### Download
 
-Download the latest ArxisOS ISO from the [Releases](https://github.com/arxisos/arxisos/releases) page.
+The verified development ISO and checksums are in the isolated lab output directory. No public release was created or verified by this work.
 
-### Creating Bootable Media
+### Disposable VM testing
 
-#### Linux
-```bash
-sudo dd if=ArxisOS-1.2-x86_64.iso of=/dev/sdX bs=4M status=progress oflag=sync
-```
-
-#### Windows
-Use [Rufus](https://rufus.ie/) or [balenaEtcher](https://www.balena.io/etcher/)
-
-#### macOS
-```bash
-sudo dd if=ArxisOS-1.2-x86_64.iso of=/dev/diskN bs=4m
-```
+Use the isolated lab launchers described in [the acceptance plan](docs/ISOLATED-TEST-PLAN.md).
+They attach only owned QCOW2 files and read-only media, serialize VMs and refuse unknown
+ownership markers. Physical media writes are outside the executed workflow.
 
 ### Installation Process
 
 1. Boot from the USB/DVD
-2. Select **"Start ArxisOS"** from the boot menu
-3. Once the live desktop loads, click **"Install ArxisOS"** on the desktop
+2. Select **"Start VIGILOS"** from the boot menu
+3. Once the live desktop loads, click **"Install VIGILOS"** on the desktop
 4. Follow the Anaconda installer wizard
-5. Reboot and enjoy ArxisOS!
+5. Reboot and enjoy VIGILOS!
 
 ### Live Session
 
-The live environment includes a fully functional KDE Plasma desktop with automatic login. You can explore ArxisOS before installing.
+The live environment includes a fully functional KDE Plasma desktop with automatic login. You can explore VIGILOS before installing.
 
 - **Default User:** `liveuser` (no password, passwordless sudo)
-- **Session:** Plasma X11
+- **Session:** Plasma Wayland
 
 ---
 
@@ -185,7 +142,7 @@ The live environment includes a fully functional KDE Plasma desktop with automat
 
 ### Current: DNF (Fedora Package Manager)
 
-ArxisOS currently uses DNF with access to Fedora 43 repositories:
+VIGILOS currently uses DNF with access to Fedora 44 repositories:
 
 ```bash
 # Update system
@@ -218,7 +175,7 @@ flatpak run org.application.Name
 
 ---
 
-## ApM — Arxis Package Manager
+## VpM — VIGILOS Package Manager
 
 <p align="center">
   <img src="https://img.shields.io/badge/status-In%20Development-orange?style=for-the-badge" alt="Status"/>
@@ -226,73 +183,62 @@ flatpak run org.application.Name
 
 ### Coming Soon
 
-We are developing **ApM (Arxis Package Manager)** — a next-generation package manager designed specifically for ArxisOS. Inspired by the simplicity and power of Arch Linux's pacman and AUR, ApM will provide:
+**VpM is a design proposal in this checkout.** No Rust implementation or native transaction engine is present here. Its proposed features require prototypes, security review and disposable-root tests; the current ISO uses supported RPM/DNF5 updates. See VPM.md for open system-ownership and rollback decisions. Proposed features:
 
 | Feature | Description |
 |---------|-------------|
-| **Native `.apm` Packages** | Lightweight, efficient package format designed for ArxisOS |
-| **RPM Compatibility** | Seamless installation of Fedora/RHEL `.rpm` packages |
-| **ApR Repository** | Community-driven package repository (like Arch's AUR) |
-| **APMBUILD System** | Simple, readable build scripts for package creation |
-| **Built in Rust** | Blazing-fast performance with parallel downloads |
+| **Native `.vpm` Packages** | Lightweight, efficient package format designed for VIGILOS |
+| **RPM Compatibility** | Planned; RPM-owned system state must remain authoritative in rpmdb until a separate migration is designed |
+| **ViR Repository** | Community-driven package repository (like Arch's AUR) |
+| **VPMBUILD System** | Simple, readable build scripts for package creation |
+| **Rust implementation** | Planned; performance and parallel transactions are unverified |
 
 <p align="center">
-  <a href="APM.md">
-    <img src="https://img.shields.io/badge/📖_Read_the_Full_ApM_Documentation-4A90D9?style=for-the-badge" alt="ApM Documentation"/>
+  <a href="VPM.md">
+    <img src="https://img.shields.io/badge/📖_Read_the_Full_VpM_Documentation-4A90D9?style=for-the-badge" alt="VpM Documentation"/>
   </a>
 </p>
 
-> **Want to learn more?** Check out the **[ApM Documentation](APM.md)** for detailed information on package format, CLI usage, building packages, the ApR repository system, and RPM compatibility.
+> **Want to learn more?** Check out the **[VpM Documentation](VPM.md)** for detailed information on package format, CLI usage, building packages, the ViR repository system, and RPM compatibility.
 
 ---
 
-## Building ArxisOS
+## Building VIGILOS
 
-### Prerequisites
+### Isolated build entry points
 
-- Fedora 43 host (the branding step chroots into a Fedora rootfs)
-- Root/sudo access (loop devices, mount, chroot)
-- ~50 GB free disk space
-- Packages:
-  ```bash
-  sudo dnf install -y osbuild-composer composer-cli weldr-client \
-    squashfs-tools xorriso rsync xz cpio ImageMagick \
-    grub2-tools grub2-tools-extra dosfstools pykickstart
-  ```
-- **Line endings:** all scripts are LF-only (enforced by `.gitattributes`). If you edit on Windows, keep them LF — a CRLF shebang (`#!/bin/bash\r`) fails with "exec format error" on Linux.
-- Sanity-check the tree before building: `./scripts/validate.sh`
+The executed route remixes a verified official Fedora 44 KDE ISO, updates the full base
+through signed official repositories, creates product-owned development RPMs, regenerates
+a matching kernel/initramfs, and packs a clean EROFS root into a hybrid BIOS/UEFI ISO.
+Fedora 44 names its EROFS payload `LiveOS/squashfs.img`; it is not SquashFS.
 
-### Build Process
+Run build dependencies, mounts and chroots inside a dedicated disposable Fedora builder.
+`guest-builder-setup.sh` and `build-and-brand.sh` require the VM marker and explicit
+`VIGIL_BUILD_GUEST=1`; the marker is an accidental-host-execution guard. See the
+[isolated acceptance plan](docs/ISOLATED-TEST-PLAN.md) for resource and network boundaries.
+The osbuild-composer and legacy kickstart alternatives are not the validated release route.
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/arxisos/arxisos-build.git
-   cd arxisos-build
-   ```
+```bash
+# Source-only checks (no installation or VM start):
+bash scripts/validate.sh
+# Inside the already prepared, approved disposable builder only:
+VIGIL_BUILD_GUEST=1 bash scripts/build-and-brand.sh /path/to/verified-Fedora-KDE.iso
+```
 
-2. **Start osbuild-composer:**
-   ```bash
-   sudo systemctl start osbuild-composer.socket
-   ```
-
-3. **Build the base ISO:**
-   ```bash
-   ./scripts/build-iso.sh --wait
-   ```
-
-4. **Apply ArxisOS branding:**
-   ```bash
-   sudo ./scripts/apply-composer-branding.sh <base-iso> ArxisOS-1.2-x86_64.iso
-   ```
+`build-and-brand.sh` creates a fresh output directory and preserves old outputs.
+`apply-composer-branding.sh` performs the remix; `package-branding.sh` creates local
+unsigned development RPMs while retaining upstream signature policy. `pack-prepared-root.sh`
+and `finish-prepared-image.sh` support reviewed recovery of an already prepared build.
+The final candidate record identifies any reused prepared root and newly rebuilt parts.
 
 ### Project Structure
 
 ```
-arxisos-build/
+vigilos-build/
 ├── blueprints/           # osbuild-composer blueprints
-│   └── arxisos-kde.toml  # Main KDE Plasma blueprint
+│   └── vigilos-kde.toml  # Main KDE Plasma blueprint
 ├── branding/             # Visual assets
-│   ├── logos/            # ArxisOS logos and icons
+│   ├── logos/            # VIGILOS logos and icons
 │   ├── wallpapers/       # Desktop wallpapers
 │   ├── plymouth/         # Boot splash theme
 │   ├── grub/             # Bootloader theme
@@ -306,7 +252,7 @@ arxisos-build/
 ├── Screenshots/          # OS screenshots for documentation
 ├── PLASMA-CONFIGS/       # KDE configuration files
 ├── Skel/                 # User skeleton files
-├── APM.md                # ApM Package Manager documentation
+├── VPM.md                # VpM Package Manager documentation
 └── README.md             # This file
 ```
 
@@ -316,7 +262,7 @@ arxisos-build/
 
 ### Changing Themes
 
-ArxisOS uses KDE Plasma's standard theming system:
+VIGILOS uses KDE Plasma's standard theming system:
 
 1. Open **System Settings**
 2. Navigate to **Appearance**
@@ -330,7 +276,7 @@ ArxisOS uses KDE Plasma's standard theming system:
 
 ### Wallpapers
 
-Default wallpapers are located in `/usr/share/wallpapers/ArxisOS/`.
+Default wallpapers are located in `/usr/share/wallpapers/VIGILOS/`.
 
 To add custom wallpapers, place them in `~/.local/share/wallpapers/`.
 
@@ -373,11 +319,11 @@ sudo dnf distro-sync
 
 ## Contributing
 
-We welcome contributions to ArxisOS! Here's how you can help:
+We welcome contributions to VIGILOS! Here's how you can help:
 
 ### Reporting Issues
 
-- Use the [GitHub Issues](https://github.com/arxisos/arxisos/issues) page
+- Use the [GitHub Issues](https://github.com/vigilglm/vigilos/issues) page
 - Include system information: `fastfetch` or `inxi -F`
 - Provide steps to reproduce the issue
 
@@ -394,8 +340,8 @@ We welcome contributions to ArxisOS! Here's how you can help:
 - **Theming** — Improve or create new visual themes
 - **Documentation** — Help improve docs and guides
 - **Testing** — Test on different hardware configurations
-- **Translations** — Help translate ArxisOS
-- **ApM Development** — Contribute to the package manager
+- **Translations** — Help translate VIGILOS
+- **VpM Development** — Contribute to the package manager
 
 ---
 
@@ -414,15 +360,15 @@ We welcome contributions to ArxisOS! Here's how you can help:
 - [x] Pre-installed applications
 
 ### Version 1.1 (Planned)
-- [ ] ApM package manager (alpha)
-- [ ] ArxisOS Welcome application
+- [ ] VpM package manager (alpha)
+- [ ] VIGILOS Welcome application
 - [ ] Additional wallpapers
 - [ ] Improved installer experience
 
 ### Version 2.0 (Future)
-- [ ] ApM package manager (stable)
-- [ ] ApR community repository
-- [ ] ArxisOS-specific applications
+- [ ] VpM package manager (stable)
+- [ ] ViR community repository
+- [ ] VIGILOS-specific applications
 - [ ] ARM64 support
 
 ---
@@ -438,13 +384,13 @@ We welcome contributions to ArxisOS! Here's how you can help:
 - [Fedora Project](https://fedoraproject.org/) — Base distribution
 - [KDE Community](https://kde.org/) — Plasma desktop environment
 - [PurPurDay Theme](https://store.kde.org/) — Original theme inspiration
-- All open-source contributors whose work makes ArxisOS possible
+- All open-source contributors whose work makes VIGILOS possible
 
 ---
 
 ## License
 
-ArxisOS is distributed under the **GNU General Public License v3.0**.
+VIGILOS is distributed under the **GNU General Public License v3.0**.
 
 See [LICENSE](LICENSE) for more information.
 
@@ -452,15 +398,15 @@ See [LICENSE](LICENSE) for more information.
 
 ## Links
 
-- **Website:** [https://arxisos.com](https://arxisos.com)
-- **Documentation:** [https://docs.arxisos.com](https://docs.arxisos.com)
-- **Support:** [https://support.arxisos.com](https://support.arxisos.com)
-- **GitHub:** [https://github.com/arxisos](https://github.com/arxisos)
+- **Website:** [https://vigilglm.ai](https://vigilglm.ai)
+- **Documentation:** [https://docs.vigilglm.ai](https://docs.vigilglm.ai)
+- **Support:** [https://support.vigilglm.ai](https://support.vigilglm.ai)
+- **GitHub:** [https://github.com/vigilglm](https://github.com/vigilglm)
 
 ---
 
 <p align="center">
-  <strong>ArxisOS</strong> — Where Beauty Meets Performance
+  <strong>VIGILOS</strong> — Where Beauty Meets Performance
 </p>
 
 <p align="center">

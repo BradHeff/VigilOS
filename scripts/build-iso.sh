@@ -1,15 +1,19 @@
 #!/bin/bash
 set -euo pipefail
 
-BUILD_DIR="/home/bheffernan/arxisos-build"
-BLUEPRINT="arxisos-kde"
+BUILD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$BUILD_DIR/scripts/lib/require-builder.sh"
+vigilos_require_builder
+OUTPUT_DIR="${VIGIL_COMPOSE_OUTPUT_DIR:-/build/output/base}"
+mkdir -p "$OUTPUT_DIR"
+BLUEPRINT="vigilos-kde"
 IMAGE_TYPE="workstation-live-installer"
 # Derive version from blueprint to keep messaging in sync
-VERSION=$(grep -m1 '^version' "$BUILD_DIR/blueprints/arxisos-kde.toml" 2>/dev/null | sed -E 's/.*"([^"]*)".*/\1/')
+VERSION=$(grep -m1 '^version' "$BUILD_DIR/blueprints/vigilos-kde.toml" 2>/dev/null | sed -E 's/.*"([^"]*)".*/\1/')
 VERSION="${VERSION:-1.0}"
 
-echo "=== ArxisOS Build Script (osbuild-composer) ==="
-echo "Building ArxisOS $VERSION"
+echo "=== VIGILOS Build Script (osbuild-composer) ==="
+echo "Building VIGILOS $VERSION"
 echo "Started: $(date)"
 echo ""
 
@@ -21,7 +25,7 @@ fi
 
 # Push latest blueprint
 echo "Pushing blueprint..."
-sudo composer-cli blueprints push "$BUILD_DIR/blueprints/arxisos-kde.toml"
+sudo composer-cli blueprints push "$BUILD_DIR/blueprints/vigilos-kde.toml"
 
 # Start compose
 echo "Starting compose..."
@@ -74,11 +78,11 @@ if [ "${1:-}" = "--wait" ]; then
             echo ""
             echo "=== Build Complete ==="
             echo "Downloading ISO..."
-            cd "$BUILD_DIR"
+            cd "$OUTPUT_DIR"
             sudo composer-cli compose image "$COMPOSE_ID"
             ISO_FILE=$(ls -1t *.iso 2>/dev/null | head -1)
             if [ -n "$ISO_FILE" ]; then
-                echo "ISO: $BUILD_DIR/$ISO_FILE"
+                echo "ISO: $OUTPUT_DIR/$ISO_FILE"
                 echo "Size: $(du -h "$ISO_FILE" | cut -f1)"
             fi
             exit 0

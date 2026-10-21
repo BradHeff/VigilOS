@@ -108,6 +108,7 @@ ForegroundPositive=0,170,127
 ForegroundVisited=136,136,204
 
 [General]
+BrowserApplication=brave-browser.desktop
 ColorScheme=PurPurDayColor
 ColorSchemeHash=9f63c7711a13123582e720791ea0f8c0172977d2
 Name=PurPurDay

@@ -1,0 +1,9 @@
+# Official Brave stable repository: https://brave.com/linux/
+[brave-browser]
+name=Brave Browser (official stable)
+enabled=1
+gpgcheck=1
+sslverify=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-brave-release
+baseurl=https://brave-browser-rpm-release.s3.brave.com/$basearch
+includepkgs=brave-browser,brave-keyring

@@ -4,6 +4,7 @@ import QtQuick 2.5
 Image {
     id: root
     source: "images/Krunica.png"
+    fillMode: Image.PreserveAspectCrop
 
     property int stage
 
@@ -36,6 +37,7 @@ Image {
 
             sourceSize.width: size
             sourceSize.height: size
+            fillMode: Image.PreserveAspectFit
 
             ParallelAnimation {
                 running: true

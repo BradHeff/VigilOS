@@ -1,4 +1,4 @@
-# ArxisOS — enforce LF on everything that runs or is parsed on Linux.
+# VIGILOS — enforce LF on everything that runs or is parsed on Linux.
 # CRLF in a shell script makes the shebang `#!/bin/bash\r`, which the Linux
 # kernel rejects with "exec format error". This file prevents that regressing
 # regardless of the OS the repo is edited on.

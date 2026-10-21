@@ -44,7 +44,7 @@ alias fixpng="find . -type f -name "*.png" -exec convert {} -strip {} \;"
 #add new fonts
 alias fc="sudo fc-cache -fv"
 
-alias clean="sudo rm -rf /tmp/*"
+alias clean="sudo systemd-tmpfiles --clean"
 
 alias gpl="git pull"
 alias gcl="git clone"

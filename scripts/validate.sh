@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# validate.sh — Pre-build sanity checks for the ArxisOS source tree.
+# validate.sh — Pre-build sanity checks for the VIGILOS source tree.
 # Safe to run on the Fedora build host before ./scripts/build-iso.sh.
 # Deeper checks (ksvalidator, shellcheck) activate when those tools are present.
 #
@@ -12,7 +12,7 @@ ok()   { printf '\033[1;32m  PASS\033[0m %s\n' "$*"; }
 bad()  { printf '\033[1;31m  FAIL\033[0m %s\n' "$*"; fail=1; }
 note() { printf '\033[1;33m  SKIP\033[0m %s\n' "$*"; }
 
-echo "== ArxisOS source validation =="
+echo "== VIGILOS source validation =="
 
 # 1. No CRLF / BOM in anything that runs or is parsed on Linux ----------------
 echo "-- line endings (LF only) --"
@@ -45,30 +45,33 @@ fi
 
 # 4. Required files present ----------------------------------------------------
 echo "-- required files --"
-for f in blueprints/arxisos-kde.toml kickstarts/arxisos-kde.ks \
+for f in blueprints/vigilos-kde.toml kickstarts/vigilos-kde.ks \
          scripts/build-iso.sh scripts/build-and-brand.sh \
          scripts/apply-composer-branding.sh scripts/cleanup-mounts.sh \
-         branding/plymouth/arxisos/arxisos.plymouth \
-         branding/plymouth/arxisos/arxisos.script \
-         branding/grub/arxisos/theme.txt \
-         branding/grub/arxisos/background.png \
-         branding/sddm/arxisos/Main.qml \
-         branding/sddm/arxisos/metadata.desktop \
-         branding/wallpapers/ArxisOS/metadata.json \
+         branding/plymouth/vigilos/vigilos.plymouth \
+         branding/plymouth/vigilos/vigilos.script \
+         branding/grub/vigilos/theme.txt \
+         branding/grub/vigilos/background.png \
+         branding/sddm/vigilos/Main.qml \
+         branding/sddm/vigilos/metadata.desktop \
+         branding/wallpapers/VIGILOS/metadata.json \
          branding/wallpapers/default.png \
-         branding/logos/arxisos-logo.png \
-         branding/logos/arxisos-watermark-128.png; do
+         branding/logos/vigilos-logo.png \
+         branding/logos/vigilos-watermark-128.png \
+         branding/repos/brave-browser.repo branding/repos/pki/brave-core.asc \
+         scripts/install-default-apps.sh scripts/runtime/vigilos-anaconda-browser \
+         Skel/.config/mimeapps.list; do
   [ -s "$f" ] && ok "$f" || bad "$f missing or empty"
 done
 
 # 5. Identity consistency: no stray Fedora identity, codename is Loopback -----
 echo "-- distro identity --"
-if grep -RIl 'NAME="ArxisOS"' scripts kickstarts >/dev/null 2>&1; then
-  ok "os-release sets NAME=ArxisOS"
+if grep -RIl 'NAME="VIGIL OS"' scripts kickstarts >/dev/null 2>&1; then
+  ok "os-release sets NAME=VIGIL OS"
 else
-  bad "os-release ArxisOS NAME not found"
+  bad "os-release VIGILOS NAME not found"
 fi
-if grep -RIn 'usr/lib/os-release' scripts/apply-composer-branding.sh kickstarts/arxisos-kde.ks >/dev/null 2>&1; then
+if grep -RIn 'usr/lib/os-release' scripts/apply-composer-branding.sh kickstarts/vigilos-kde.ks >/dev/null 2>&1; then
   ok "/usr/lib/os-release is overwritten (no Fedora leak)"
 else
   bad "/usr/lib/os-release not overwritten — Fedora identity will leak"
@@ -80,16 +83,16 @@ else
 fi
 
 # 5b. Anaconda profile present (gen_grub_cfgstub bootloader-install fix) -------
-# Rebranding ID=arxisos makes Anaconda fall back to efi_dir="default" unless an
-# arxisos profile (inheriting fedora) ships in the live env. Without it the
+# Rebranding ID=vigilos makes Anaconda fall back to efi_dir="default" unless an
+# vigilos profile (inheriting fedora) ships in the live env. Without it the
 # install dies with "gen_grub_cfgstub script failed". Guard all 3 build paths.
 echo "-- anaconda installer profile --"
 prof_ok=1
 for f in scripts/apply-composer-branding.sh scripts/Alternative/apply-branding.sh \
-         kickstarts/arxisos-kde.ks; do
-  if grep -q 'anaconda/profile.d/arxisos.conf' "$f" 2>/dev/null \
+         kickstarts/vigilos-kde.ks; do
+  if grep -q 'anaconda/profile.d/vigilos.conf' "$f" 2>/dev/null \
      && grep -q 'base_profile = fedora' "$f" 2>/dev/null \
-     && grep -q 'os_id = arxisos' "$f" 2>/dev/null; then
+     && grep -q 'os_id = vigilos' "$f" 2>/dev/null; then
     ok "anaconda profile fix present in $f"
   else
     bad "anaconda profile fix MISSING in $f (bootloader install will fail)"; prof_ok=0
@@ -107,7 +110,7 @@ fi
 # 7. kickstart validation (if pykickstart present) ----------------------------
 echo "-- kickstart --"
 if command -v ksvalidator >/dev/null 2>&1; then
-  ksvalidator kickstarts/arxisos-kde.ks && ok "kickstart valid" || bad "kickstart invalid"
+  ksvalidator kickstarts/vigilos-kde.ks && ok "kickstart valid" || bad "kickstart invalid"
 else
   note "pykickstart (ksvalidator) not installed"
 fi
