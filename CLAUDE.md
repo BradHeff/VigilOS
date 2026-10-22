@@ -1,12 +1,16 @@
 # VIGIL OS project handoff
 
-VIGIL OS 1.2 “Loopback” is a Fedora44-based KDE Plasma Wayland development distribution. Keep the Loopback codename. The current user goal is a coherent independent product identity while retaining upstream compatibility, provenance and licenses. VpM is a separate native-package-manager design, not implemented production software.
+VIGIL OS 1.2 “Loopback” is a Fedora44-based development distribution with KDE Plasma Wayland and i3 X11 editions. Keep the Loopback codename. The current user goal is a coherent independent product identity while retaining upstream compatibility, provenance and licenses. VpM is a separate native-package-manager design, not implemented production software.
 
 ## Authoritative build route
 
-Read `README.md`, `docs/ISOLATED-TEST-PLAN.md` and `docs/VALIDATION-2026-10-21.md`. The tested route starts with a checksum/signature-verified official Fedora44 KDE live ISO inside an owned disposable Fedora builder. `scripts/build-and-brand.sh` calls `apply-composer-branding.sh`; it does not start osbuild-composer. Product assets and identity are packaged by `package-branding.sh` and `package-release-common.sh`. `pack-prepared-root.sh` supports reviewed incremental candidate recovery and encodes target SELinux contexts directly into EROFS. The live payload retains Fedora's filename `LiveOS/squashfs.img`, despite being EROFS.
+Read `README.md` and `docs/BUILD.md`. The only user build entry point is `bash scripts/build-and-brand.sh`, run as the normal host user. It verifies pinned signed Fedora inputs, boots fresh disposable cloud overlays sequentially, installs builder dependencies in each VM and invokes the complete fresh root preparation/branding/pack/ISO route. `--desktop kde|i3|both` selects editions. Active implementation lives in `scripts/lib`; installed product helpers live in `scripts/runtime`. Superseded composer/livecd scripts and old host cleanup/setup wrappers were removed. Never restore them as alternative user routes.
 
-All custom installation, package operations, mounts, chroots and initramfs generation belong inside the disposable builder. The marker and `VIGIL_BUILD_GUEST=1` guard prevent accidental host execution; they are not a security sandbox. Do not install host dependencies, start host daemons, weaken host SELinux/firewalls/KVM permissions, attach physical disks or write USB. The current lab serializes VMs with a lock and uses only owned QCOW2 disks, read-only media and private Unix control sockets. No host shares or credentials. Preserve old outputs.
+All package operations, mounts, chroots and initramfs generation belong inside the disposable builder. The marker and `VIGIL_BUILD_GUEST=1` guard prevent accidental host execution; they are not a security sandbox. No host dependency installation, daemons, security changes, physical media or host shares. Builder SSH uses task-generated ephemeral keys and loopback forwarding only; never use personal SSH keys or inspect credentials. Preserve existing outputs and earlier candidate033 evidence. `.build` is private disposable state and excluded from Git.
+
+The user explicitly authorized changing the current host wallpaper to the shared ISO wallpaper. This was applied with a separate backed-up i3 wallpaper-line change, not as part of ISO build execution. Do not broaden that authorization into host package or security changes.
+
+The i3 edition imports sanitized user configs, fonts/licenses, the exact Git prompt helper and relevant local controls. Keep personal exports, fixed monitor assignments, clipboard history and NVIDIA-only bar modules out of shipped defaults. Preserve upstream PAM authentication for the color lock and use the shared wallpaper for desktop/greeter/lock.
 
 ## Current product behavior
 
@@ -18,6 +22,8 @@ All custom installation, package operations, mounts, chroots and initramfs gener
 - Normal account creation, root locked, correct newest kernel initially, no redundant Plasma Setup, and installed removal of live user/autologin/sudo/installer shortcuts. Optional Git prompt support must not break shell startup.
 
 ## Evidence and historical notes
+
+Fresh KDE/i3 builds and acceptance for this script cleanup live in `/home/bheffernan/Documents/Codex/2026-10-22/task/work`. Read `docs/VALIDATION-2026-10-22.md` and the actual evidence before making acceptance claims. The source recovery/promotion record is `work/evidence/LATEST-PROMOTION.json`; source parity and original Git preservation must pass before treating the Project checkout as updated. Build logs, private ephemeral keys and VM disks stay outside public source.
 
 The lab at `/home/bheffernan/Documents/Codex/2026-10-21/task-3/vigil-lab` contains candidate ISOs, exact logs/screenshots, `evidence/ACCEPTANCE.json` and the source change manifest. Do not infer successful tests from historical prose. `docs/VALIDATION-2026-10-21.md` summarizes only actual runs and clearly labels remaining limits. Synchronize final source to `/home/bheffernan/Project/VigilOS` only under a verified scoped backup, preserving original `.git` and the two protected unreadable legacy ISO files; the latest lab promotion record, not this prose, confirms completion.
 

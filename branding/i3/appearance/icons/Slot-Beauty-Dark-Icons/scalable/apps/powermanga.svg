@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="62"
+   height="62"
+   version="1.1"
+   id="svg8"
+   sodipodi:docname="powermanga.svg"
+   inkscape:version="1.4.4 (unknown)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs8" />
+  <sodipodi:namedview
+     id="namedview8"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="5.9140625"
+     inkscape:cx="31.957728"
+     inkscape:cy="43.033025"
+     inkscape:window-width="1920"
+     inkscape:window-height="994"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg8" />
+  <g
+     id="g9"
+     transform="matrix(0.98214286,0,0,0.98245614,-0.42857152,-0.92982456)">
+    <g
+       id="g8">
+      <circle
+         cx="32"
+         cy="47"
+         r="14"
+         style="opacity:0.2"
+         id="circle1" />
+      <circle
+         cx="32"
+         cy="46"
+         r="14"
+         style="fill:#ffd42a"
+         id="circle2" />
+      <path
+         d="M 18,47 H 46 C 46,47 60,45 60,39 60,26 41,19 41,19 H 23 c 0,0 -19,7 -19,20 0,6 14,8 14,8 z"
+         style="opacity:0.2"
+         id="path2" />
+      <path
+         d="M 18,46 H 46 C 46,46 60,44 60,38 60,25 41,18 41,18 H 23 c 0,0 -19,7 -19,20 0,6 14,8 14,8 z"
+         style="fill:#00b2b2;fill-opacity:1"
+         id="path3" />
+      <path
+         d="M 23,18 C 23,18 4,25 4,38 4,38.128967 4.014685,38.253615 4.027344,38.378906 4.6216457,25.779966 23,19 23,19 h 18 c 0,0 18.378354,6.779966 18.972656,19.378906 C 59.985315,38.253615 60,38.128967 60,38 60,25 41,18 41,18 Z"
+         style="opacity:0.2;fill:#ffffff"
+         id="path4" />
+      <path
+         d="M 32,5 C 37,5 46,19 46,44 46,55 32,55 32,55 32,55 18,55 18,44 18,19 27,5 32,5 Z"
+         style="opacity:0.2"
+         id="path5" />
+      <path
+         d="M 32,4 C 37,4 46,18 46,43 46,54 32,54 32,54 32,54 18,54 18,43 18,18 27,4 32,4 Z"
+         style="fill:#c83771"
+         id="path6" />
+      <ellipse
+         cx="32"
+         cy="38.5"
+         rx="6"
+         ry="8.5"
+         style="opacity:0.2"
+         id="ellipse6" />
+      <ellipse
+         cx="32"
+         cy="37.5"
+         rx="6"
+         ry="8.5"
+         style="fill:#00ccff"
+         id="ellipse7" />
+      <path
+         d="m 32,29 a 6,8.5 0 0 0 -6,8.5 6,8.5 0 0 0 0.01563,0.570312 A 6,8.5 0 0 1 32,30 6,8.5 0 0 1 37.984375,37.929688 6,8.5 0 0 0 38,37.5 6,8.5 0 0 0 32,29 Z"
+         style="opacity:0.2;fill:#ffffff"
+         id="path7" />
+      <path
+         d="m 32,4 c -5,0 -14,14 -14,39 0,0.0725 0.0066,0.139392 0.0078,0.210938 C 18.196392,18.710349 27.053359,5 32,5 36.946641,5 45.803608,18.710349 45.992188,43.210938 45.993396,43.139392 46,43.072498 46,43 46,18 37,4 32,4 Z"
+         style="opacity:0.2;fill:#ffffff"
+         id="path8" />
+    </g>
+  </g>
+</svg>

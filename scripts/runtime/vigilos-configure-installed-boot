@@ -36,4 +36,6 @@ fi
 # Regenerate only the canonical configuration; preserve signed Fedora EFI
 # binaries and the installer-generated EFI config stub.
 grub2-mkconfig -o /boot/grub2/grub.cfg
-restorecon -RF /etc/sddm.conf.d /var/lib/AccountsService /boot
+for path in /etc/sddm.conf.d /etc/lightdm /var/lib/AccountsService /boot; do
+    [[ ! -e "$path" ]] || restorecon -RF "$path"
+done

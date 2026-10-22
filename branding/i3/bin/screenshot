@@ -1,0 +1,195 @@
+#!/usr/bin/env bash
+
+# Directories
+screenshot_directory="$HOME/Pictures/Screenshots"
+videos_directory="$HOME/Videos"
+audio_directory="$HOME/Music"
+
+mkdir -p "$screenshot_directory" "$videos_directory" "$audio_directory"
+
+# Timestamp & screen resolution
+date="$(date '+%Y-%m-%d_%H-%M-%S')" # e.g. 2025-08-10_18-53-58
+screen_resolution="$(xrandr --current | sed -n 's/^Screen .* current \([0-9]*\) x \([0-9]*\),.*/\1x\2/p')"
+[ -z "$screen_resolution" ] && screen_resolution="1920x1080"
+
+# Audio sources via pactl (PipeWire-friendly)
+microphone=""
+desktop=""
+
+if command -v pactl >/dev/null 2>&1; then
+    default_source="$(pactl get-default-source 2>/dev/null || echo "")"
+    default_sink="$(pactl get-default-sink 2>/dev/null || echo "")"
+
+    if [ -n "$default_source" ]; then
+        microphone="$default_source"
+    else
+        # first non-monitor source
+        microphone="$(pactl list short sources 2>/dev/null | awk '!/monitor/ {print $2; exit}')"
+    fi
+
+    if [ -n "$default_sink" ]; then
+        desktop="${default_sink}.monitor"
+    else
+        # first monitor source
+        desktop="$(pactl list short sources 2>/dev/null | awk '/monitor/ {print $2; exit}')"
+    fi
+fi
+
+get_area() {
+    # slop prints: w,h,x,y
+    slop_out="$(slop -n -f '%w,%h,%x,%y')" || exit 1
+    w=$(echo "$slop_out" | cut -d ',' -f1)
+    h=$(echo "$slop_out" | cut -d ',' -f2)
+    x=$(echo "$slop_out" | cut -d ',' -f3)
+    y=$(echo "$slop_out" | cut -d ',' -f4)
+    # make even (some encoders like even sizes)
+    [ $((w%2)) -eq 1 ] && w=$(( w + 1 ))
+    [ $((h%2)) -eq 1 ] && h=$(( h + 1 ))
+    [ $((x%2)) -eq 1 ] && x=$(( x + 1 ))
+    [ $((y%2)) -eq 1 ] && y=$(( y + 1 ))
+    wh="${w}x${h}"
+}
+
+screenshot_selected_area() {
+    get_area
+    ffmpeg -hide_banner -loglevel error \
+        -f x11grab -video_size "$wh" -framerate 1 -i "${DISPLAY:-:0}"+"$x","$y" \
+        -frames:v 1 "$screenshot_directory/$date.png"
+    command -v xclip >/dev/null 2>&1 && \
+        xclip -selection clipboard -t image/png -i "$screenshot_directory/$date.png"
+    notify-send -i "$screenshot_directory/$date.png" "Screenshot" "Area screenshot taken"
+}
+
+screenshot_full_screen() {
+    ffmpeg -hide_banner -loglevel error \
+        -f x11grab -video_size "$screen_resolution" -framerate 1 -i "${DISPLAY:-:0}" \
+        -frames:v 1 "$screenshot_directory/$date.png"
+    command -v xclip >/dev/null 2>&1 && \
+        xclip -selection clipboard -t image/png -i "$screenshot_directory/$date.png"
+    notify-send -i "$screenshot_directory/$date.png" "Screenshot" "Full screen screenshot taken"
+}
+
+video_selected_area() {
+    get_area
+    ffmpeg -hide_banner -loglevel error -show_region 1 \
+        -f x11grab -video_size "$wh" -framerate 30 -i "${DISPLAY:-:0}"+"$x","$y" \
+        -pix_fmt yuv420p "$videos_directory/$date.mp4"
+    ffmpeg -hide_banner -loglevel error \
+        -i "$videos_directory/$date.mp4" -ss 00:00:01.000 -vframes 1 "/tmp/$date.png"
+    notify-send -i "/tmp/$date.png" "Video" "Area video taken"
+}
+
+video_full_screen() {
+    ffmpeg -hide_banner -loglevel error -show_region 1 \
+        -f x11grab -video_size "$screen_resolution" -framerate 30 -i "${DISPLAY:-:0}" \
+        -pix_fmt yuv420p "$videos_directory/$date.mp4"
+    ffmpeg -hide_banner -loglevel error \
+        -i "$videos_directory/$date.mp4" -ss 00:00:01.000 -vframes 1 "/tmp/$date.png"
+    notify-send -i "/tmp/$date.png" "Video" "Full screen video taken"
+}
+
+video_full_screen_rgba() {
+    ffmpeg -hide_banner -loglevel error -show_region 1 \
+        -f x11grab -video_size "$screen_resolution" -framerate 30 -i "${DISPLAY:-:0}" \
+        -pix_fmt rgba "$videos_directory/$date.mp4"
+    ffmpeg -hide_banner -loglevel error \
+        -i "$videos_directory/$date.mp4" -ss 00:00:01.000 -vframes 1 "/tmp/$date.png"
+    notify-send -i "/tmp/$date.png" "Video" "Full screen video taken (rgba)"
+}
+
+audio_microphone() {
+    if [ -z "$microphone" ]; then
+        notify-send "Audio" "No PulseAudio microphone source found"
+        return 1
+    fi
+    ffmpeg -hide_banner -loglevel error \
+        -f pulse -i "$microphone" -metadata title="$date" \
+        "$audio_directory/$date.mp3"
+    notify-send "Audio" "Microphone audio recorded"
+}
+
+audio_desktop() {
+    if [ -z "$desktop" ]; then
+        notify-send "Audio" "No desktop monitor source found"
+        return 1
+    fi
+    ffmpeg -hide_banner -loglevel error \
+        -f pulse -i "$desktop" -metadata title="$date" \
+        "$audio_directory/$date.mp3"
+    notify-send "Audio" "Desktop audio recorded"
+}
+
+video_selected_area_audio_microphone() {
+    if [ -z "$microphone" ]; then
+        notify-send "Video" "No microphone source found"
+        return 1
+    fi
+    get_area
+    ffmpeg -hide_banner -loglevel error -show_region 1 \
+        -f x11grab -video_size "$wh" -framerate 30 -i "${DISPLAY:-:0}"+"$x","$y" \
+        -f pulse -i "$microphone" \
+        -pix_fmt yuv420p "$videos_directory/$date.mp4"
+    ffmpeg -hide_banner -loglevel error \
+        -i "$videos_directory/$date.mp4" -ss 00:00:01.000 -vframes 1 "/tmp/$date.png"
+    notify-send -i "/tmp/$date.png" "Video" "Area video with audio taken"
+}
+
+video_full_screen_audio_microphone() {
+    if [ -z "$microphone" ]; then
+        notify-send "Video" "No microphone source found"
+        return 1
+    fi
+    ffmpeg -hide_banner -loglevel error -show_region 1 \
+        -f x11grab -video_size "$screen_resolution" -framerate 30 -i "${DISPLAY:-:0}" \
+        -f pulse -i "$microphone" \
+        -pix_fmt yuv420p "$videos_directory/$date.mp4"
+    ffmpeg -hide_banner -loglevel error \
+        -i "$videos_directory/$date.mp4" -ss 00:00:01.000 -vframes 1 "/tmp/$date.png"
+    notify-send -i "/tmp/$date.png" "Video" "Full screen video with audio taken"
+}
+
+stop() {
+    pkill -fxn '(/\S+)*ffmpeg\s.*\sx11grab\s.*' 2>/dev/null || true
+    pkill -fxn '(/\S+)*ffmpeg\s.*\spulse\s.*' 2>/dev/null || true
+    exit 0
+}
+
+help() {
+cat << EOF
+Usage: screenshot [option]
+
+-h | -help | --help                     Show this help
+-s  | -stop                             Stop running ffmpeg captures
+-sa | -screenshot_selected_area         Screenshot selected area
+-sf | -screenshot_full_screen          Screenshot full screen
+-va | -video_selected_area             Record video of selected area
+-vf | -video_full_screen               Record full screen video
+-vf_rgba | -video_full_screen_rgba     Record full screen RGBA video
+-am | -audio_microphone                Record microphone only (PulseAudio)
+-ad | -audio_desktop                   Record desktop audio only (PulseAudio)
+-vaam | -video_selected_area_audio_microphone  Area video + mic audio
+-vfam | -video_full_screen_audio_microphone    Fullscreen video + mic audio
+EOF
+}
+
+main() {
+    while [ "$1" != "" ]; do
+        case "$1" in
+            -h | -help | --help) help; exit 0 ;;
+            -s | -stop)          stop; exit 0 ;;
+            -sa)                 screenshot_selected_area ;;
+            -sf)                 screenshot_full_screen ;;
+            -va)                 video_selected_area ;;
+            -vf)                 video_full_screen ;;
+            -vf_rgba)            video_full_screen_rgba ;;
+            -am)                 audio_microphone ;;
+            -ad)                 audio_desktop ;;
+            -vaam)               video_selected_area_audio_microphone ;;
+            -vfam)               video_full_screen_audio_microphone ;;
+            *)                   echo "ERROR: unknown parameter \"$1\""; help; exit 1 ;;
+        esac
+        shift
+    done
+}
+
+main "$@"

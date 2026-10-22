@@ -1,12 +1,13 @@
 # VIGIL OS 1.2 “Loopback”
 
-VIGIL OS is a Fedora44-based KDE Plasma Wayland distribution with its own boot, login, desktop and installer identity. This checkout is a development candidate, not a publicly signed production release. Actual build/install evidence and limitations are recorded in [the validation record](docs/VALIDATION-2026-10-21.md); historical progress files do not certify the current candidate.
+VIGIL OS is a Fedora44-based distribution with KDE Plasma Wayland and i3 X11 editions with its own boot, login, desktop and installer identity. This checkout is a development candidate, not a publicly signed production release. Actual build/install evidence and limitations are recorded in [the fresh-build validation record](docs/VALIDATION-2026-10-22.md); historical progress files do not certify the current images.
 
 ## Included software
 
 | Purpose | Software |
 | --- | --- |
-| Desktop | KDE Plasma Wayland, SDDM, Dolphin, Konsole, Kate, Discover |
+| KDE desktop | Plasma Wayland, SDDM, Dolphin, Konsole, Kate, Discover |
+| i3 desktop | i3 X11, LightDM, Polybar, Rofi, i3lock-color, Greenclip, Alacritty, Thunar |
 | Browser | Brave, default for HTTP, HTTPS and HTML |
 | Office | LibreOffice Writer, Calc and Impress |
 | Development | Node.js24, npm, Python3 |
@@ -15,7 +16,7 @@ VIGIL OS is a Fedora44-based KDE Plasma Wayland distribution with its own boot, 
 
 Firefox, Fedora bookmarks and the optional Fedora Media Writer application are removed. The live desktop has one **Install VIGIL OS** launcher using Anaconda. Installed systems remove live-only shortcuts, the live account, passwordless live sudo and autologin. Users create their own account in the actual installer; no preconfigured privileged account ships.
 
-SELinux remains Enforcing on live and installed boots. Anaconda temporarily changes enforcement while installing and restores it on normal exit. Guided storage uses Btrfs root/home, ext4 `/boot` and a FAT EFI partition for UEFI. Native hardware, proprietary GPU drivers and Secure Boot acceptance remain outside the completed VM evidence. Four-GiB installation was exercised; this is not a universal hardware minimum guarantee.
+SELinux remains Enforcing on live and installed boots. Anaconda temporarily changes enforcement while installing and restores it on normal exit. Guided storage uses Btrfs root/home, ext4 `/boot` and a FAT EFI partition for UEFI. Native hardware, proprietary GPU drivers and Secure Boot acceptance remain outside the completed VM evidence. Fresh acceptance uses six-GiB guests; the older candidate033 also exercised four-GiB installation. Neither establishes a universal hardware minimum.
 
 ## Branding
 
@@ -23,18 +24,15 @@ GRUB, Plymouth, SDDM, Plasma splash, wallpaper, welcome and installer use VIGIL 
 
 ## Build and test
 
-Read [the isolated test plan](docs/ISOLATED-TEST-PLAN.md) before execution. Use a dedicated, owned disposable Fedora builder. No host package/service/security changes or physical-media writes are part of the validated workflow.
+Run one command as your normal host user:
 
 ```bash
-# Static source checks:
-bash scripts/validate.sh
-# Inside the prepared disposable builder only:
-VIGIL_BUILD_GUEST=1 bash scripts/build-and-brand.sh /path/to/verified-Fedora-KDE.iso
+bash scripts/build-and-brand.sh
 ```
 
-The main route remixes a verified official Fedora44 KDE ISO, updates through signed repositories, creates product-owned development RPMs, rebuilds the matching generic live kernel/initramfs and packs an EROFS root into a hybrid BIOS/UEFI ISO. Fedora44 names the payload `LiveOS/squashfs.img`; it is EROFS. Outputs use fresh paths. `pack-prepared-root.sh` and `finish-prepared-image.sh` support reviewed incremental recovery. Legacy composer/kickstart/Alternative routes are not the tested release route.
+This builds separate KDE and i3 ISOs using verified official Fedora input and a fresh disposable builder for each. Select one with `--desktop kde` or `--desktop i3`; use `--check` for source/prerequisite checks only. Output ISOs, SHA256 files and build-evidence archives are placed in a fresh timestamped directory under `.build/output/`. No existing output is overwritten. Host dependencies are checked, never installed automatically; all package operations and mounts run inside the builder.
 
-The private lab is `/home/bheffernan/Documents/Codex/2026-10-21/task-3/vigil-lab`. Its `output/` contains the verified candidate and checksum; `evidence/` contains actual installer, boot, update and visual captures. VM disks, downloads and test outputs are kept outside this source folder. The validation record identifies reused prepared roots and the exact final artifact.
+See [the complete build guide](docs/BUILD.md) for requirements, workspace/cache options, i3 shortcuts and script organization. The i3 edition uses your portable dotfile theme with Polybar, Rofi, i3lock-color, Greenclip, Alacritty and LightDM; it omits NVIDIA-specific bar modules and personal machine settings. Both editions use the same VIGIL City wallpaper. Original candidate033 evidence remains historical; new clean-build and live-test evidence is recorded separately.
 
 ## Package manager roadmap
 
@@ -50,4 +48,4 @@ The private lab is `/home/bheffernan/Documents/Codex/2026-10-21/task-3/vigil-lab
 
 Upstream legal notices and licenses are retained. See `LICENSE` and individual asset/package notices. No public release, push or signing infrastructure was created by this work.
 
-Validated development artifact: candidate033 (actual BIOS/UEFI graphical installs, ISO-free first boots/repeated boots, signed updates, required apps and display matrix). See [the exact validation record](docs/VALIDATION-2026-10-21.md) for checksum, evidence and limits.
+Current KDE and i3 artifact hashes and actual tests are listed in [the 22 October validation record](docs/VALIDATION-2026-10-22.md). The earlier candidate033 BIOS/UEFI installations and display matrix remain in [the historical record](docs/VALIDATION-2026-10-21.md).

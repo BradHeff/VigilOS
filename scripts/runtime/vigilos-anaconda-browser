@@ -54,7 +54,7 @@ def main():
         child = subprocess.Popen([
             str(binary), '--password-store=basic', f'--user-data-dir={profile}',
             '--no-first-run', '--no-default-browser-check', '--start-maximized',
-            '--ozone-platform=wayland', f'--app={sys.argv[1]}'
+            ('--ozone-platform=wayland' if os.environ.get('WAYLAND_DISPLAY') else '--ozone-platform=x11'), f'--app={sys.argv[1]}'
         ], env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, close_fds=True, bufsize=0)
         # Only fresh pipes are inherited by sandboxed browser children. Preserve

@@ -1,3 +1,9 @@
+# Current build workflow
+
+The user now requests a complete one-command fresh build of both KDE and i3 editions. See [BUILD.md](BUILD.md). New runs use fresh cloud overlays in the selected private workspace; earlier lab disks/checkpoints/ISOs are preserved. At most one builder/test VM is active for this task. Host packages/security/services remain unchanged. The historical candidate033 resource layout and test evidence below describe the earlier completed task, not limits or acceptance claims for the new implementation.
+
+---
+
 # VIGIL OS isolated build and acceptance plan
 
 Status: execution was explicitly approved. Actual BIOS and UEFI installations, first boots, signed package updates and visual comparisons have run. Candidate033 BIOS/UEFI installation, firstboot and repeated-boot acceptance passed; the retained UEFI checkpoint was restored and cold-booted again, and final source promotion is verified in its separate scoped record; see `VALIDATION-2026-10-21.md` and the private lab `evidence/ACCEPTANCE.json`. Source promotion into the original project was later explicitly authorized and performed under a verified scoped backup, preserving `.git` and two protected unreadable legacy ISOs. Historical documentation is not new test evidence.

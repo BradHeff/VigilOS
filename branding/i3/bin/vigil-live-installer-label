@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+if /usr/local/libexec/vigilos-is-live; then printf 'Install VIGIL OS\n'; fi

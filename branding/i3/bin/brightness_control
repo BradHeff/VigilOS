@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+step=+5
+while getopts s: opt; do case "$opt" in s) step=$OPTARG ;; *) exit 2 ;; esac; done
+command -v brightnessctl >/dev/null || exit 0
+case "$step" in -*) exec brightnessctl set "${step#-}%-" ;; +*) exec brightnessctl set "${step#+}%+" ;; *) exit 2 ;; esac

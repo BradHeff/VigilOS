@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if /usr/local/libexec/vigilos-is-live; then
+    notify-send "VIGIL OS" "Screen locking is enabled after installation, with your account password."
+    exit 0
+fi
+wallpaper=/usr/share/vigilos/wallpapers/VIGILOS/contents/images/1672x941.png
+dimensions=$(xrandr --current | sed -n 's/^Screen .* current \([0-9]*\) x \([0-9]*\),.*/\1x\2/p')
+width=${dimensions%x*}; height=${dimensions#*x}
+[[ "$width" =~ ^[0-9]+$ && "$height" =~ ^[0-9]+$ ]]
+size=$((height / 7)); ((size > 160)) && size=160
+args=()
+case "${1:-}" in --nofork) args+=(--nofork) ;; --suspend) : ;; '') ;; *) exit 2 ;; esac
+i3lock-color "${args[@]}" --force-clock --fill -i "$wallpaper" -e \
+ --refresh-rate=1 --line-uses-inside --pointer=default \
+ --inside-color=9ece6a --ring-color=9ece6a --insidever-color=9ece6a --ringver-color=9ece6a \
+ --insidewrong-color=db4b4b --ringwrong-color=db4b4b --keyhl-color=9ece6a --separator-color=9ece6a --bshl-color=9ece6a \
+ --time-str="%H:%M" --time-size="$size" --time-pos="x+w/2:y+h*0.30" --time-font="Iosevka Nerd Font" --time-color=dedede \
+ --date-str="%a %d %b" --date-size="$((size / 3))" --date-pos="x+w/2:y+h*0.40" --date-color=dedede \
+ --verif-text=Verifying --wrong-text="Wrong Password!" --noinput-text="No input" \
+ --verif-pos="x+w/2:y+h/2" --wrong-pos="x+w/2:y+h/2" --verif-color=9ece6a --wrong-color=db4b4b \
+ --bar-indicator --bar-direction=0 --bar-step=10 --bar-max-height=10 --bar-base-width=10 \
+ --bar-total-width="$width" --bar-color=00000000 --bar-pos="0:$((height-10))"
+if [[ ${1:-} == --suspend ]]; then systemctl suspend; fi

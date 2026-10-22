@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -eu
+umask 077
+[[ -n "${XDG_RUNTIME_DIR:-}" ]] || exit 0
+exec 9>"$XDG_RUNTIME_DIR/vigilos-battery.lock"
+flock -n 9 || exit 0
+command -v upower >/dev/null || exit 0
+battery=$(upower -e | grep '/battery_' | head -n1 || true)
+[[ -n "$battery" ]] || exit 0
+while sleep 60; do
+    info=$(upower -i "$battery")
+    level=$(awk '/percentage:/ {gsub(/%/,"",$2); print $2}' <<<"$info")
+    if [[ "$level" =~ ^[0-9]+$ ]] && ((level < 20)) && grep -q 'state:.*discharging' <<<"$info"; then
+        dunstify -r 100 -i /usr/local/bin/icons/battery.svg Battery "Low battery: $level%"
+    fi
+done

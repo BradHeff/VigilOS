@@ -14,7 +14,7 @@ case "$NAME" in
     *) echo 'ERROR: VM name must be builder, vigil or baseline.' >&2; exit 1 ;;
 esac
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LAB_ROOT="$(realpath "$REPO_DIR/..")"
+LAB_ROOT="$(realpath -m "${VIGIL_TEST_ROOT:-$REPO_DIR/.build/test}")"
 VM_ROOT="$LAB_ROOT/vm"
 mkdir -p "$VM_ROOT"
 # Only one VM is active: max 6 GiB RAM, max aggregate disk capacity 192 GiB.

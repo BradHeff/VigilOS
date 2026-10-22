@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -eu
+[[ ! -r "$HOME/.Xresources" ]] || xrdb -merge "$HOME/.Xresources"
+xrandr --dpi 96
+if /usr/local/libexec/vigilos-is-live; then
+    xset s off
+    xset -dpms
+else
+    xset s 600 600
+    xset dpms 0 0 900
+fi
+start_once() { pgrep -u "$(id -u)" -x "$1" >/dev/null || "$@" & }
+start_once lxpolkit
+start_once nm-applet
+start_once dunst
+battery_listener &
+vigil-greenclip-config
+start_once greenclip daemon
+if [[ ${VIGIL_I3_LOCK_MANAGED:-0} != 1 ]] && ! /usr/local/libexec/vigilos-is-live; then
+    start_once xss-lock --transfer-sleep-lock -- /usr/local/bin/lock --nofork
+fi

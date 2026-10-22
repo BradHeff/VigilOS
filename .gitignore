@@ -36,3 +36,6 @@ Thumbs.db
 # Build artifacts
 *.log
 *.tmp
+
+# Private disposable build state and ephemeral SSH keys
+.build/

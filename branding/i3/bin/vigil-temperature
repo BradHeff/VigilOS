@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+shopt -s nullglob
+for zone in /sys/class/thermal/thermal_zone*; do
+    [[ -r "$zone/type" && -r "$zone/temp" ]] || continue
+    kind=$(<"$zone/type")
+    case "${kind,,}" in *cpu*|*pkg*|*package*)
+        value=$(<"$zone/temp")
+        if [[ "$value" =~ ^[0-9]+$ ]]; then printf '%s°C\n' "$((value/1000))"; exit 0; fi ;;
+    esac
+done
+exit 0
