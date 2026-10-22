@@ -3,6 +3,8 @@
 # Global Properties
 title-text: ""
 desktop-image: "background.png"
+# Preserve the decorative grid geometry on4:3,16:10 and16:9 screens.
+desktop-image-scale-method: "crop"
 desktop-color: "#0d1117"
 terminal-font: "dejavu_sans_16 Regular 16"
 terminal-box: "terminal_box_*.png"

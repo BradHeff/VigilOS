@@ -18,9 +18,11 @@ chroot "$ROOT" dnf -y --releasever=44 install brave-browser libreoffice \
     nodejs24 nodejs24-bin nodejs24-npm nodejs24-npm-bin python3 flatpak
 install -Dm0644 "$REPO_DIR/branding/repos/brave-browser.repo" "$ROOT/etc/yum.repos.d/brave-browser.repo"
 # Preserve unrelated dependencies and fail if a required dependency prevents removal.
-chroot "$ROOT" dnf -y --releasever=44 --setopt=clean_requirements_on_remove=False remove firefox fedora-bookmarks
-! chroot "$ROOT" rpm -q firefox
-chroot "$ROOT" rpm -q brave-browser libreoffice-core libreoffice-writer libreoffice-calc \
+chroot "$ROOT" dnf -y --releasever=44 --setopt=clean_requirements_on_remove=False remove firefox fedora-bookmarks mediawriter
+for omitted in firefox mediawriter; do
+    ! chroot "$ROOT" rpm -q "$omitted"
+done
+chroot "$ROOT" rpm -q brave-browser libreoffice-core libreoffice-writer libreoffice-calc libreoffice-impress \
     nodejs24 nodejs24-bin nodejs24-npm nodejs24-npm-bin python3 flatpak
 chroot "$ROOT" node --version
 chroot "$ROOT" npm --version

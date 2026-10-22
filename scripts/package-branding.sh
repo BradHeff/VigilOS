@@ -57,23 +57,51 @@ IDENTITY="$(find "$WORK/RPMS" -name 'vigilos-release-identity-*.rpm' -type f | h
 cp "$IDENTITY" "$ROOTFS/tmp/vigilos-release-identity.rpm"
 chroot "$ROOTFS" dnf -y --releasever=44 install /tmp/vigilos-release-common.rpm /tmp/vigilos-release-identity.rpm
 
+bash "$REPO_DIR/scripts/package-wallpaper-compat.sh" "$ROOTFS" "$WORK"
+WALLPAPER="$(find "$WORK/RPMS" -name 'vigilos-wallpaper-compat-*.rpm' -type f | head -1)"
+cp "$WALLPAPER" "$ROOTFS/tmp/vigilos-wallpaper-compat.rpm"
+
 # These product-specific paths do not replace Fedora-owned theme/icon assets.
 PAYLOAD="$WORK/SOURCES/branding-payload"
 mkdir -p "$PAYLOAD"
-PATHS=(etc/skel/.config/mimeapps.list etc/yum.repos.d/brave-browser.repo etc/pki/rpm-gpg/RPM-GPG-KEY-brave-release usr/local/libexec/vigilos-anaconda-browser etc/skel/.config/kscreenlockerrc usr/share/color-schemes/PurPurDayColor.colors usr/share/plasma/desktoptheme/PurPurDay-Plasma/colors usr/local/libexec/vigilos-configure-installed-boot usr/share/plasma/plasma-welcome/intro-customization.desktop etc/skel/.config/autostart/imsettings-start.desktop usr/local/share/applications/liveinst.desktop usr/share/cockpit/branding/vigilos usr/share/vigilos usr/share/grub/themes/vigilos usr/share/sddm/themes/vigilos usr/share/wallpapers/VIGILOS usr/share/plymouth/themes/vigilos usr/share/plymouth/themes/vigilos-spinner usr/lib/dracut/modules.d/99vigilos-branding etc/anaconda/profile.d/vigilos.conf etc/sddm.conf.d/vigilos.conf usr/local/libexec/vigilos-is-live usr/local/libexec/vigilos-liveuser-setup usr/local/bin/vigilos-first-boot.sh etc/systemd/system/vigilos-first-boot.service etc/systemd/system/sddm-live-autologin.service etc/systemd/system/liveuser-setup.service etc/systemd/system/vigilos-gpu-setup.service usr/local/bin/vigilos-gpu-setup.sh usr/local/bin/vigilos-gpu-notify.sh etc/dracut.conf.d/vigilos-branding.conf)
+PATHS=(etc/skel/.config/kcm-about-distrorc etc/skel/.config/kdeglobals etc/skel/.config/mimeapps.list etc/yum.repos.d/brave-browser.repo etc/pki/rpm-gpg/RPM-GPG-KEY-brave-release usr/local/libexec/vigilos-anaconda-browser etc/skel/.config/kscreenlockerrc usr/share/color-schemes/PurPurDayColor.colors usr/share/plasma/desktoptheme/PurPurDay-Plasma usr/share/plasma/look-and-feel/PurPurDay-Global-6 usr/share/plasma/look-and-feel/PurPurDay-Splash-6 usr/share/plasma/look-and-feel/org.vigilos.desktop usr/local/share/plasma/look-and-feel usr/local/libexec/vigilos-configure-installed-boot usr/share/plasma/plasma-welcome/intro-customization.desktop etc/skel/.config/autostart/imsettings-start.desktop usr/local/share/applications/liveinst.desktop usr/share/cockpit/branding/vigilos usr/share/vigilos usr/share/grub/themes/vigilos usr/share/sddm/themes/vigilos usr/share/plymouth/themes/vigilos usr/share/plymouth/themes/vigilos-spinner usr/lib/dracut/modules.d/99vigilos-branding etc/anaconda/profile.d/vigilos.conf etc/sddm.conf.d/vigilos.conf usr/local/libexec/vigilos-is-live usr/local/libexec/vigilos-liveuser-setup usr/local/bin/vigilos-first-boot.sh etc/systemd/system/vigilos-first-boot.service etc/systemd/system/sddm-live-autologin.service etc/systemd/system/liveuser-setup.service etc/systemd/system/vigilos-gpu-setup.service usr/local/bin/vigilos-gpu-setup.sh usr/local/bin/vigilos-gpu-notify.sh etc/dracut.conf.d/vigilos-branding.conf)
+# Own generated fallback artwork while preserving paths belonging to upstream RPMs.
+PATHS+=(usr/share/pixmaps/vigilos-logo.png usr/share/pixmaps/vigilos-start.svg usr/share/pixmaps/vigilos-watermark.png usr/share/pixmaps/vigilos-watermark-128.png)
+ICON_CANDIDATES=()
+for name in start-here distributor-logo vigilos-start start-here-kde start-here-kde-panel; do
+    ICON_CANDIDATES+=("usr/share/icons/hicolor/scalable/apps/$name.svg")
+done
+for name in start-here distributor-logo; do ICON_CANDIDATES+=("usr/share/pixmaps/$name.svg"); done
+for size in 16 22 24 32 48 64 96 128 256 512; do
+    for name in vigilos-logo vigilos-start start-here distributor-logo start-here-kde start-here-kde-panel; do
+        ICON_CANDIDATES+=("usr/share/icons/hicolor/${size}x${size}/apps/$name.png")
+    done
+done
+for rel in "${ICON_CANDIDATES[@]}"; do
+    [[ -e "$ROOTFS/$rel" ]] || continue
+    if ! owner="$(chroot "$ROOTFS" rpm -qf --qf '%{NAME}' "/$rel" 2>/dev/null)"; then owner=""; fi
+    case "$owner" in ''|vigilos-branding) PATHS+=("$rel") ;; esac
+done
 : > "$WORK/SOURCES/branding-files.list"
 for rel in "${PATHS[@]}"; do
     [[ -e "$ROOTFS/$rel" ]] || continue
     mkdir -p "$PAYLOAD/$(dirname "$rel")"
     cp -a "$ROOTFS/$rel" "$PAYLOAD/$rel"
+    # Public product assets must remain readable by unprivileged desktop users.
+    # Imported Library PNGs can otherwise retain a private0600 mode.
+    case "$rel" in usr/share/vigilos|usr/share/plasma/look-and-feel/*|usr/local/share/plasma/look-and-feel|usr/share/sddm/themes/vigilos|usr/share/grub/themes/vigilos|usr/share/plymouth/themes/vigilos*)
+        find "$PAYLOAD/$rel" -type d -exec chmod a+rx {} +
+        find "$PAYLOAD/$rel" -type f -exec chmod a+r {} +
+        ;;
+    esac
     printf '/%s\n' "$rel" >> "$WORK/SOURCES/branding-files.list"
 done
 cat > "$WORK/SPECS/vigilos-branding.spec" <<'SPEC'
 Name: vigilos-branding
 Version: 1.2
-Release: 10%{?dist}
+Release: 16%{?dist}
 Summary: VIGIL OS desktop and boot branding assets
-License: GPL-3.0-only AND GPL-2.0-or-later AND LGPL-2.0-or-later
+License: GPL-3.0-only AND GPL-2.0-or-later AND LGPL-2.0-or-later AND CC-BY-SA-4.0
 BuildArch: noarch
 Requires: vigilos-release-identity = 1.2
 Requires: plymouth-theme-spinner
@@ -92,7 +120,7 @@ SPEC
 rpmbuild --define "_topdir $WORK" -bb "$WORK/SPECS/vigilos-branding.spec"
 BRANDING="$(find "$WORK/RPMS" -name 'vigilos-branding-*.rpm' -type f | head -1)"
 cp "$BRANDING" "$ROOTFS/tmp/vigilos-branding.rpm"
-chroot "$ROOTFS" dnf -y --releasever=44 install /tmp/vigilos-branding.rpm
-chroot "$ROOTFS" rpm -V vigilos-release-common vigilos-release-identity vigilos-branding
+chroot "$ROOTFS" dnf -y --releasever=44 install /tmp/vigilos-branding.rpm /tmp/vigilos-wallpaper-compat.rpm
+chroot "$ROOTFS" rpm -V vigilos-release-common vigilos-release-identity vigilos-branding vigilos-wallpaper-compat
 chroot "$ROOTFS" rpm -qa --qf '%{NAME} %{VERSION}-%{RELEASE}.%{ARCH}\n' | sort > "$(dirname "$WORK")/package-manifest.txt"
-rm -f "$ROOTFS/tmp/vigilos-release-common.rpm" "$ROOTFS/tmp/vigilos-release-identity.rpm" "$ROOTFS/tmp/vigilos-branding.rpm"
+rm -f "$ROOTFS/tmp/vigilos-release-common.rpm" "$ROOTFS/tmp/vigilos-release-identity.rpm" "$ROOTFS/tmp/vigilos-branding.rpm" "$ROOTFS/tmp/vigilos-wallpaper-compat.rpm"

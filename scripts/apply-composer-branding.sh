@@ -933,74 +933,13 @@ echo "=== Applying Plasma Themes (PurPurDay) ==="
 echo "  - Wallpapers..."
 # Copy VIGILOS wallpaper package (proper Plasma wallpaper structure)
 if [[ -d "$BRANDING_DIR/wallpapers/VIGILOS" ]]; then
-    sudo mkdir -p "$ROOTFS_DIR/usr/share/wallpapers/VIGILOS"
-    sudo cp -r "$BRANDING_DIR/wallpapers/VIGILOS/"* "$ROOTFS_DIR/usr/share/wallpapers/VIGILOS/"
+    sudo mkdir -p "$ROOTFS_DIR/usr/share/vigilos/wallpapers/VIGILOS"
+    sudo cp -r "$BRANDING_DIR/wallpapers/VIGILOS/"* "$ROOTFS_DIR/usr/share/vigilos/wallpapers/VIGILOS/"
 fi
 # Also copy standalone wallpapers for compatibility
-copy_if_exists "$BRANDING_DIR/wallpapers/default.png" "$ROOTFS_DIR/usr/share/wallpapers/default.png"
-copy_if_exists "$BRANDING_DIR/wallpapers/default.png" "$ROOTFS_DIR/usr/share/wallpapers/VIGILOS.png"
 
-# CRITICAL: Replace F44 wallpaper (Fedora 44 default) with VIGILOS wallpaper
-# Plasma 6 uses /usr/share/wallpapers/F44 as the default, ignoring our config
-echo "  - Replacing F44 default wallpaper with VIGILOS..."
-if [[ -d "$ROOTFS_DIR/usr/share/wallpapers/F44" ]]; then
-    VIGILOS_WALLPAPER=""
-    if [[ -f "$BRANDING_DIR/wallpapers/VIGILOS/contents/images/1672x941.png" ]]; then
-        VIGILOS_WALLPAPER="$BRANDING_DIR/wallpapers/VIGILOS/contents/images/1672x941.png"
-    elif [[ -f "$BRANDING_DIR/wallpapers/default.png" ]]; then
-        VIGILOS_WALLPAPER="$BRANDING_DIR/wallpapers/default.png"
-    fi
-
-    if [[ -n "$VIGILOS_WALLPAPER" ]]; then
-        # Replace all F44 wallpaper images with VIGILOS wallpaper
-        F44_IMAGES_DIR="$ROOTFS_DIR/usr/share/wallpapers/F44/contents/images"
-        if [[ -d "$F44_IMAGES_DIR" ]]; then
-            # Get list of resolutions from existing F44 wallpapers
-            for img in "$F44_IMAGES_DIR"/*.jxl "$F44_IMAGES_DIR"/*.png "$F44_IMAGES_DIR"/*.jpg; do
-                [[ -f "$img" ]] || continue
-                filename=$(basename "$img")
-                # Extract resolution from filename (e.g., 1920x1080.jxl -> 1920x1080)
-                resolution="${filename%.*}"
-
-                # Convert VIGILOS wallpaper to this resolution and replace
-                if command -v magick &>/dev/null; then
-                    sudo magick "$VIGILOS_WALLPAPER" -resize "${resolution}^" -gravity center -extent "$resolution" "${img%.*}.png" 2>/dev/null || true
-                    # Remove the original jxl file
-                    [[ "$img" == *.jxl ]] && sudo rm -f "$img"
-                elif command -v convert &>/dev/null; then
-                    sudo convert "$VIGILOS_WALLPAPER" -resize "${resolution}^" -gravity center -extent "$resolution" "${img%.*}.png" 2>/dev/null || true
-                    [[ "$img" == *.jxl ]] && sudo rm -f "$img"
-                else
-                    # No ImageMagick, just copy the original to replace
-                    sudo cp "$VIGILOS_WALLPAPER" "${img%.*}.png" 2>/dev/null || true
-                    [[ "$img" == *.jxl ]] && sudo rm -f "$img"
-                fi
-            done
-            echo "    F44 wallpaper images replaced with VIGILOS"
-        fi
-
-        # Update F44 metadata to show VIGILOS branding
-        if [[ -f "$ROOTFS_DIR/usr/share/wallpapers/F44/metadata.json" ]]; then
-            sudo tee "$ROOTFS_DIR/usr/share/wallpapers/F44/metadata.json" > /dev/null << 'F44_META'
-{
-    "KPlugin": {
-        "Authors": [
-            {
-                "Email": "contact@vigilglm.ai",
-                "Name": "VIGILOS Team"
-            }
-        ],
-        "Id": "F44",
-        "License": "CC-BY-SA-4.0",
-        "Name": "VIGILOS",
-        "Description": "VIGILOS default wallpaper"
-    }
-}
-F44_META
-        fi
-    fi
-fi
-
+# Product wallpaper defaults are provided through a separate look-and-feel package.
+# Keep upstream F44 artwork/metadata unchanged; XDG overlays cover compatibility IDs.
 echo "  - Logos..."
 copy_if_exists "$BRANDING_DIR/logos" "$ROOTFS_DIR/usr/share/vigilos/logos"
 copy_if_exists "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/vigilos-logo.png"
@@ -1057,72 +996,45 @@ echo "  - Aurorae window decoration (PurPurDay)..."
 copy_if_exists "$BRANDING_DIR/aurorae/PurPurDayBlur-Aurorae-6" "$ROOTFS_DIR/usr/share/aurorae/themes/PurPurDayBlur-Aurorae-6"
 
 # ============================================
-# REPLACE FEDORA ICONS WITH VIGILOS
+# PRODUCT APPLICATION MENU ICONS
 # ============================================
-echo ""
-echo "=== Replacing Fedora Icons ==="
-
-# Install start.svg as the application menu icon (start-here, distributor-logo)
+# Preserve upstream-owned fallback assets. Product aliases may occupy new paths.
+copy_product_icon() {
+    local source="$1" relative="$2" owner
+    if ! owner="$(sudo chroot "$ROOTFS_DIR" rpm -qf --qf '%{NAME}' "$relative" 2>/dev/null)"; then owner=""; fi
+    case "$owner" in
+        ''|vigilos-branding) sudo install -Dm0644 "$source" "$ROOTFS_DIR$relative" ;;
+        *) printf 'Preserving upstream icon: %s (%s)\n' "$relative" "$owner" ;;
+    esac
+}
 if [[ -f "$BRANDING_DIR/start.svg" ]]; then
-    echo "  - Installing start.svg as application menu icon..."
-
-    # Copy SVG to scalable icons
-    sudo mkdir -p "$ROOTFS_DIR/usr/share/icons/hicolor/scalable/apps"
-    sudo cp "$BRANDING_DIR/start.svg" "$ROOTFS_DIR/usr/share/icons/hicolor/scalable/apps/start-here.svg"
-    sudo cp "$BRANDING_DIR/start.svg" "$ROOTFS_DIR/usr/share/icons/hicolor/scalable/apps/distributor-logo.svg"
-    sudo cp "$BRANDING_DIR/start.svg" "$ROOTFS_DIR/usr/share/icons/hicolor/scalable/apps/vigilos-start.svg"
-    sudo cp "$BRANDING_DIR/start.svg" "$ROOTFS_DIR/usr/share/icons/hicolor/scalable/apps/start-here-kde.svg"
-    sudo cp "$BRANDING_DIR/start.svg" "$ROOTFS_DIR/usr/share/icons/hicolor/scalable/apps/start-here-kde-panel.svg"
-
-    # Generate PNG versions from start.svg for different sizes
-    if command -v convert &> /dev/null || command -v magick &> /dev/null; then
-        CONVERT_CMD="convert"
-        command -v magick &> /dev/null && CONVERT_CMD="magick"
-
-        for size in 16 22 24 32 48 64 96 128 256 512; do
-            ICON_DIR="$ROOTFS_DIR/usr/share/icons/hicolor/${size}x${size}/apps"
-            sudo mkdir -p "$ICON_DIR"
-            echo "    - Generating ${size}x${size} icons from start.svg..."
-            sudo $CONVERT_CMD -background none "$BRANDING_DIR/start.svg" -resize ${size}x${size} "$ICON_DIR/start-here.png" 2>/dev/null || true
-            sudo cp "$ICON_DIR/start-here.png" "$ICON_DIR/distributor-logo.png" 2>/dev/null || true
-            sudo cp "$ICON_DIR/start-here.png" "$ICON_DIR/vigilos-start.png" 2>/dev/null || true
-            sudo cp "$ICON_DIR/start-here.png" "$ICON_DIR/start-here-kde.png" 2>/dev/null || true
-            sudo cp "$ICON_DIR/start-here.png" "$ICON_DIR/start-here-kde-panel.png" 2>/dev/null || true
-        done
-    fi
-
-    # Copy to pixmaps
-    echo "  - Copying start.svg to pixmaps..."
-    sudo cp "$BRANDING_DIR/start.svg" "$ROOTFS_DIR/usr/share/pixmaps/start-here.svg" 2>/dev/null || true
-    sudo cp "$BRANDING_DIR/start.svg" "$ROOTFS_DIR/usr/share/pixmaps/distributor-logo.svg" 2>/dev/null || true
-    sudo cp "$BRANDING_DIR/start.svg" "$ROOTFS_DIR/usr/share/pixmaps/vigilos-start.svg" 2>/dev/null || true
-fi
-
-# Install vigilos-logo.png for other branding (fedora replacements)
-if [[ -f "$BRANDING_DIR/logos/vigilos-logo.png" ]]; then
-    echo "  - Installing vigilos-logo.png for system branding..."
-
-    # Replace fedora-logo icons in hicolor
+    for name in start-here distributor-logo vigilos-start start-here-kde start-here-kde-panel; do
+        copy_product_icon "$BRANDING_DIR/start.svg" "/usr/share/icons/hicolor/scalable/apps/$name.svg"
+    done
+    CONVERT_CMD="$(command -v magick || command -v convert)"
     for size in 16 22 24 32 48 64 96 128 256 512; do
         ICON_DIR="$ROOTFS_DIR/usr/share/icons/hicolor/${size}x${size}/apps"
-        if [[ -d "$ICON_DIR" ]]; then
-            if command -v convert &> /dev/null || command -v magick &> /dev/null; then
-                CONVERT_CMD="convert"
-                command -v magick &> /dev/null && CONVERT_CMD="magick"
-                sudo $CONVERT_CMD "$BRANDING_DIR/logos/vigilos-logo.png" -resize ${size}x${size} "$ICON_DIR/fedora-logo-icon.png" 2>/dev/null || true
-                sudo cp "$ICON_DIR/fedora-logo-icon.png" "$ICON_DIR/fedora-logo-small.png" 2>/dev/null || true
-                sudo cp "$ICON_DIR/fedora-logo-icon.png" "$ICON_DIR/vigilos-logo.png" 2>/dev/null || true
-            fi
-        fi
+        sudo mkdir -p "$ICON_DIR"
+        sudo "$CONVERT_CMD" -background none "$BRANDING_DIR/start.svg" -resize "${size}x${size}" "$ICON_DIR/vigilos-start.png"
+        for name in start-here distributor-logo start-here-kde start-here-kde-panel; do
+            copy_product_icon "$ICON_DIR/vigilos-start.png" "/usr/share/icons/hicolor/${size}x${size}/apps/$name.png"
+        done
     done
+    for name in start-here distributor-logo vigilos-start; do
+        copy_product_icon "$BRANDING_DIR/start.svg" "/usr/share/pixmaps/$name.svg"
+    done
+fi
 
-    # Replace in pixmaps
-    echo "  - Replacing pixmaps..."
-    sudo cp "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/fedora-logo.png" 2>/dev/null || true
-    sudo cp "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/fedora-logo-small.png" 2>/dev/null || true
-    sudo cp "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/fedora-gdm-logo.png" 2>/dev/null || true
-    sudo cp "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/system-logo-white.png" 2>/dev/null || true
-    sudo cp "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/vigilos-logo.png" 2>/dev/null || true
+# Install product-named icons without modifying Fedora-owned upstream artwork.
+# Consumers select vigilos-logo through os-release/product theme configuration.
+if [[ -f "$BRANDING_DIR/logos/vigilos-logo.png" ]]; then
+    for size in 16 22 24 32 48 64 96 128 256 512; do
+        ICON_DIR="$ROOTFS_DIR/usr/share/icons/hicolor/${size}x${size}/apps"
+        sudo mkdir -p "$ICON_DIR"
+        CONVERT_CMD="$(command -v magick || command -v convert)"
+        sudo "$CONVERT_CMD" "$BRANDING_DIR/logos/vigilos-logo.png" -resize "${size}x${size}" "$ICON_DIR/vigilos-logo.png"
+    done
+    sudo install -Dm0644 "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/vigilos-logo.png"
 fi
 
 # ============================================
@@ -1172,6 +1084,7 @@ BrowserApplication=brave-browser.desktop
 KDEGLOBALS
 
 sudo install -Dm0644 "$SKEL_DIR/.config/mimeapps.list" "$ROOTFS_DIR/etc/skel/.config/mimeapps.list"
+sudo install -Dm0644 "$SKEL_DIR/.config/kcm-about-distrorc" "$ROOTFS_DIR/etc/skel/.config/kcm-about-distrorc"
 
 # kcminputrc - Cursor theme
 sudo tee "$ROOTFS_DIR/etc/skel/.config/kcminputrc" > /dev/null << 'KCMINPUT'
@@ -1220,53 +1133,15 @@ plugin=org.kde.plasma.folder
 wallpaperplugin=org.kde.image
 
 [Containments][1][Wallpaper][org.kde.image][General]
-Image=/usr/share/wallpapers/VIGILOS/
-PreviewImage=/usr/share/wallpapers/VIGILOS/contents/images/1672x941.png
+Image=/usr/share/wallpapers/F44/
+PreviewImage=/usr/share/vigilos/wallpapers/VIGILOS/contents/images/1672x941.png
 SlidePaths=/usr/share/wallpapers/
 PLASMADESKTOP
 
-# Method 2: Set default wallpaper via Plasma shell defaults (critical for Plasma 6)
-# Handle case where 'defaults' might be a file instead of directory
-PLASMA_DEFAULTS_PATH="$ROOTFS_DIR/usr/share/plasma/shells/org.kde.plasma.desktop/contents/defaults"
-if [[ -f "$PLASMA_DEFAULTS_PATH" ]]; then
-    # 'defaults' is a file, append wallpaper config to it
-    if ! grep -q "defaultWallpaperTheme" "$PLASMA_DEFAULTS_PATH" 2>/dev/null; then
-        sudo tee -a "$PLASMA_DEFAULTS_PATH" > /dev/null << 'PLASMA_DEFAULTS'
-
-[Wallpaper]
-defaultFilePath=/usr/share/wallpapers/VIGILOS/contents/images/1672x941.png
-defaultWallpaperTheme=VIGILOS
-PLASMA_DEFAULTS
-    fi
-elif [[ -d "$PLASMA_DEFAULTS_PATH" ]]; then
-    # 'defaults' is a directory, create file inside it
-    sudo tee "$PLASMA_DEFAULTS_PATH/wallpaper" > /dev/null << 'PLASMA_DEFAULTS'
-[Wallpaper]
-defaultFilePath=/usr/share/wallpapers/VIGILOS/contents/images/1672x941.png
-defaultWallpaperTheme=VIGILOS
-PLASMA_DEFAULTS
-else
-    # Neither exists, create the file
-    sudo mkdir -p "$(dirname "$PLASMA_DEFAULTS_PATH")"
-    sudo tee "$PLASMA_DEFAULTS_PATH" > /dev/null << 'PLASMA_DEFAULTS'
-[Wallpaper]
-defaultFilePath=/usr/share/wallpapers/VIGILOS/contents/images/1672x941.png
-defaultWallpaperTheme=VIGILOS
-PLASMA_DEFAULTS
-fi
-
-# Method 3: Create system-wide plasmarc with wallpaper defaults
-sudo mkdir -p "$ROOTFS_DIR/etc/xdg"
-sudo tee "$ROOTFS_DIR/etc/xdg/plasmarc" > /dev/null << 'PLASMARC_DEFAULT'
-[Theme]
-name=default
-
-[Wallpapers]
-defaultWallpaperTheme=VIGILOS
-defaultFileSuffix=.png
-defaultWidth=1672
-defaultHeight=941
-PLASMARC_DEFAULT
+# A minimal product look-and-feel selects wallpaper without replacing panel layouts
+# or modifying the upstream plasma-desktop shell-defaults file.
+VIGIL_BUILD_GUEST=1 python3 "$BUILD_DIR/scripts/prepare-desktop-defaults.py" "$ROOTFS_DIR" "$BRANDING_DIR"
+sudo chroot "$ROOTFS_DIR" kwriteconfig6 --file /etc/skel/.config/kdeglobals --group KDE --key LookAndFeelPackage org.vigilos.desktop
 
 # Explicit product lock-screen defaults; preserve upstream wallpaper packages.
 sudo install -m0644 "$SKEL_DIR/.config/kscreenlockerrc" "$ROOTFS_DIR/etc/skel/.config/kscreenlockerrc"
@@ -1279,6 +1154,7 @@ if [[ -d "$ROOTFS_DIR/home/liveuser" ]]; then
     sudo cp "$ROOTFS_DIR/etc/skel/.config/plasmarc" "$ROOTFS_DIR/home/liveuser/.config/"
     sudo cp "$ROOTFS_DIR/etc/skel/.config/kdeglobals" "$ROOTFS_DIR/home/liveuser/.config/"
     sudo cp "$ROOTFS_DIR/etc/skel/.config/mimeapps.list" "$ROOTFS_DIR/home/liveuser/.config/"
+    sudo cp "$ROOTFS_DIR/etc/skel/.config/kcm-about-distrorc" "$ROOTFS_DIR/home/liveuser/.config/"
     sudo cp "$ROOTFS_DIR/etc/skel/.config/kcminputrc" "$ROOTFS_DIR/home/liveuser/.config/"
     sudo cp "$ROOTFS_DIR/etc/skel/.config/kwinrc" "$ROOTFS_DIR/home/liveuser/.config/"
     sudo cp "$ROOTFS_DIR/etc/skel/.config/ksplashrc" "$ROOTFS_DIR/home/liveuser/.config/"
@@ -1534,6 +1410,8 @@ INSTALLER_CSS
 sudo mkdir -p "$ROOTFS_DIR/usr/share/cockpit/branding/vigilos"
 sudo cp "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/cockpit/branding/vigilos/logo.png"
 sudo cp "$BRANDING_DIR/logos/vigilos-logo-full.png" "$ROOTFS_DIR/usr/share/cockpit/branding/vigilos/brand-large.png"
+# Cockpit falls back to the upstream favicon unless product branding supplies one.
+sudo install -m0644 "$BRANDING_DIR/logos/vigilos-icon-16.png" "$ROOTFS_DIR/usr/share/cockpit/branding/vigilos/favicon.ico"
 sudo tee "$ROOTFS_DIR/usr/share/cockpit/branding/vigilos/branding.css" >/dev/null <<'COCKPIT_CSS'
 /* VIGIL OS product styling. Upstream Cockpit/Anaconda licenses are retained. */
 #badge { inline-size: 80px; block-size: 80px; background: url("logo.png") center / contain no-repeat; }

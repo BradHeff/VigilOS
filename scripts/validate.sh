@@ -34,6 +34,13 @@ while IFS= read -r -d '' s; do
   bash -n "$s" && ok "$s" || bad "$s syntax error"
 done < <(find scripts -name '*.sh' -print0 2>/dev/null)
 
+# Python viewer syntax is checked without executing any browser or guest action.
+if python3 - "$REPO_DIR/scripts/runtime/vigilos-anaconda-browser" <<'PY_VIEWER'
+import pathlib,sys
+p=pathlib.Path(sys.argv[1]);compile(p.read_text(),str(p),'exec')
+PY_VIEWER
+then ok "Anaconda Brave viewer Python syntax"; else bad "Anaconda Brave viewer syntax"; fi
+
 # 3. shellcheck (optional) ----------------------------------------------------
 if command -v shellcheck >/dev/null 2>&1; then
   echo "-- shellcheck (warnings) --"
@@ -63,6 +70,11 @@ for f in blueprints/vigilos-kde.toml kickstarts/vigilos-kde.ks \
          Skel/.config/mimeapps.list; do
   [ -s "$f" ] && ok "$f" || bad "$f missing or empty"
 done
+
+# Imported public artwork must be readable by desktop users.
+while IFS= read -r -d '' f; do
+  bad "public branding asset lacks world-read permission: $f"
+done < <(find branding -type f ! -perm -004 -print0)
 
 # 5. Identity consistency: no stray Fedora identity, codename is Loopback -----
 echo "-- distro identity --"

@@ -118,7 +118,7 @@ widgetStyle=breeze
 Theme=Magna-Glassy-Light-Icons
 
 [KDE]
-LookAndFeelPackage=PurPurDay-Global-6
+LookAndFeelPackage=org.vigilos.desktop
 widgetStyle=breeze
 
 [WM]
