@@ -3,6 +3,7 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$REPO_DIR/scripts/lib/require-builder.sh"
 vigilos_require_builder
+source "$REPO_DIR/scripts/lib/product-version.sh"
 DESKTOP="${VIGIL_DESKTOP:-kde}"
 [[ "$DESKTOP" == kde || "$DESKTOP" == i3 ]] || exit 2
 BASE="${VIGIL_BASE_ISO:-${1:-/dev/disk/by-label/Fedora-KDE-Live-44}}"
@@ -11,7 +12,7 @@ OUTPUT_ROOT="${VIGIL_OUTPUT_ROOT:-/build/output}"
 WORK_ROOT="${VIGIL_WORK_ROOT:-/build/work}"
 mkdir -p "$OUTPUT_ROOT" "$WORK_ROOT"
 RUN_DIR="$(mktemp -d "$OUTPUT_ROOT/candidate.XXXXXX")"
-ISO_PATH="$RUN_DIR/VIGILOS-1.2-${DESKTOP}-x86_64.iso"
+ISO_PATH="$RUN_DIR/VIGILOS-${VIGIL_VERSION}-${DESKTOP}-x86_64.iso"
 bash "$REPO_DIR/scripts/validate.sh" 2>&1 | tee "$RUN_DIR/validation.log"
 VIGIL_WORK_ROOT="$WORK_ROOT" bash "$REPO_DIR/scripts/lib/remix.sh" "$BASE" "$ISO_PATH" 2>&1 | tee "$RUN_DIR/branding.log"
 sha256sum "$ISO_PATH" > "$ISO_PATH.sha256"

@@ -4,10 +4,11 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$REPO_DIR/scripts/lib/require-builder.sh"
 vigilos_require_builder
+source "$REPO_DIR/scripts/lib/product-version.sh"
 WORK="$(realpath "$1")"
 INPUT="$(readlink -f "$2")"
 OUTPUT="$(realpath -m "$3")"
-LABEL="${4:-VIGILOS-1-2-x86_64}"
+LABEL="${4:-VIGILOS-${VIGIL_VERSION//./-}-${VIGIL_DESKTOP:-kde}-x86_64}"
 ROOT="$WORK/squashfs"
 STAGE="$WORK/new_iso"
 IMAGE="$STAGE/LiveOS/squashfs.img"

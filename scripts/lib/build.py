@@ -9,6 +9,8 @@ from __future__ import annotations
 import argparse, datetime, fcntl, hashlib, json, os, re, shlex, shutil
 import socket, subprocess, sys, threading, time, urllib.request
 from pathlib import Path
+sys.dont_write_bytecode = True
+from version import BuildLock, preview_release, reserve_release
 
 REPO = Path(__file__).resolve().parents[2]
 FEDORA_KEY = '36F612DCF27F7D1A48A835E4DBFCF71C6D9F90A6'
@@ -95,11 +97,12 @@ runcmd:
     (work/'meta-data').write_text(f'instance-id: vigil-{work.name}\nlocal-hostname: vigil-builder\n')
     run(['xorriso','-as','mkisofs','-quiet','-R','-J','-V','cidata','-o',work/'seed.iso',work/'user-data',work/'meta-data'])
 
-def copy_source(work):
+def copy_source(work, release_dir):
     # Explicit source roots exclude Git/private history, builds, images and keys.
     roots=['scripts','branding','Skel','PLASMA-CONFIGS','kickstarts','LICENSE']
     run(['xorriso','-as','mkisofs','-quiet','-R','-J','-V','VIGIL_SOURCE',
-         '-m','__pycache__','-m','*.pyc','-o',work/'source.iso','-graft-points',*[f'{name}={REPO/name}' for name in roots]],cwd=REPO)
+         '-m','__pycache__','-m','*.pyc','-o',work/'source.iso','-graft-points',*[f'{name}={REPO/name}' for name in roots],
+         f'version.json={release_dir / "version.json"}', f'release.json={release_dir / "release.json"}'],cwd=REPO)
 
 def stream_build(command, work, qemu, timeout):
     process=subprocess.Popen(command,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1)
@@ -123,7 +126,7 @@ def stream_build(command, work, qemu, timeout):
 
 def build_edition(desktop, inputs, args, parent):
     work=parent/desktop; work.mkdir(mode=0o700)
-    copy_source(work)
+    copy_source(work, parent)
     run(['ssh-keygen','-q','-t','ed25519','-N','','-f',work/'builder-key'])
     cloud_seed(work,(work/'builder-key.pub').read_text())
     run(['qemu-img','create','-q','-f','qcow2','-F','qcow2','-b',inputs['cloud'],work/'builder.qcow2','104G'])
@@ -157,6 +160,11 @@ def build_edition(desktop, inputs, args, parent):
         stream_build(ssh+[remote],work,qemu,args.build_timeout)
         manifest=run(ssh+['sudo python3 /build/source/scripts/lib/export-artifacts.py'],capture_output=True,text=True)
         record=json.loads(manifest.stdout)
+        expected={args.release.iso_name(desktop), args.release.evidence_name(desktop)}
+        if {entry['name'] for entry in record} != expected or len(record) != 2:
+            raise RuntimeError('Builder artifacts do not match the reserved release/edition')
+        if any(entry.get('release') != args.release.record() for entry in record):
+            raise RuntimeError('Builder release metadata differs from the reserved run snapshot')
         (work/'guest-artifacts.json').write_text(json.dumps(record,indent=2))
         args.output.mkdir(parents=True,exist_ok=True)
         for entry in record:
@@ -175,7 +183,7 @@ def build_edition(desktop, inputs, args, parent):
         try:qemu.wait(timeout=60)
         except subprocess.TimeoutExpired:raise RuntimeError('Builder did not complete clean shutdown')
         log(f'{desktop}: ISO transfer hash verified, builder powered off')
-        (work/'SUCCESS.json').write_text(json.dumps({'desktop':desktop,'artifacts':record,'verified':True},indent=2))
+        (work/'SUCCESS.json').write_text(json.dumps({'desktop':desktop,'release':args.release.record(),'artifacts':record,'verified':True},indent=2))
     finally:
         if qemu.poll() is None:
             qemu.terminate()
@@ -201,21 +209,45 @@ def main():
     if missing:parser.error('Install these host tools first: '+', '.join(missing))
     if not os.access('/dev/kvm',os.R_OK|os.W_OK):parser.error('Existing usable /dev/kvm required; no host permission changes are made')
     run(['bash',REPO/'scripts/validate.sh'])
-    if args.check:log('Host prerequisites and source checks passed');return
+    upcoming=preview_release(REPO/'version.json')
+    if args.check:
+        log(f'Host prerequisites and source checks passed; next release {upcoming.version} ({upcoming.codename}); version counter unchanged')
+        return
+    # This checkout-wide lock also covers different --workspace directories.
+    with BuildLock(REPO) as release_lock:
+        build_run(args, release_lock)
+
+def build_run(args, release_lock):
     args.workspace.mkdir(parents=True,exist_ok=True)
-    lock=(args.workspace/'build.lock').open('a')
-    try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-    except BlockingIOError:parser.error('Another build is active in this workspace')
+    with (args.workspace/'build.lock').open('a') as lock:
+        try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except BlockingIOError:raise RuntimeError('Another build is active in this workspace; version was not consumed')
+        build_locked_workspace(args, release_lock)
+
+def build_locked_workspace(args, release_lock):
     stamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     parent=args.workspace/f'run-{stamp}';parent.mkdir(mode=0o700)
     args.output=args.output or args.workspace/'output'/stamp
+    if args.output.exists() and (not args.output.is_dir() or any(args.output.iterdir())):
+        raise RuntimeError('Fresh output directory required; no version was consumed')
     inputs=verify_inputs(args.cache,parent)
-    for desktop in (['kde','i3'] if args.desktop=='both' else [args.desktop]):
-        build_edition(desktop,inputs,args,parent)
-    (args.workspace/'LATEST.json').write_text(json.dumps({'output':str(args.output),'evidence':str(parent),'desktop':args.desktop,'complete':True},indent=2))
+    args.release=reserve_release(REPO,parent,stamp,release_lock)
+    log(f'Reserved VIGIL OS {args.release.version} ({args.release.codename}) for this run; both editions share this version')
+    result={'release':args.release.record(),'desktop':args.desktop,'output':str(args.output),'status':'running'}
+    (parent/'RUN.json').write_text(json.dumps(result,indent=2)+'\n')
+    try:
+        for desktop in (['kde','i3'] if args.desktop=='both' else [args.desktop]):
+            build_edition(desktop,inputs,args,parent)
+    except BaseException as exc:
+        result.update(status='failed',error=str(exc),version_reused=False)
+        (parent/'RUN.json').write_text(json.dumps(result,indent=2)+'\n')
+        raise
+    result.update(status='complete')
+    (parent/'RUN.json').write_text(json.dumps(result,indent=2)+'\n')
+    (args.workspace/'LATEST.json').write_text(json.dumps({'output':str(args.output),'evidence':str(parent),'desktop':args.desktop,'release':args.release.record(),'complete':True},indent=2))
     log(f'COMPLETE: verified images in {args.output}; evidence in {parent}')
 
 if __name__=='__main__':
     try:main()
-    except (RuntimeError,TimeoutError,subprocess.CalledProcessError) as exc:
+    except (RuntimeError,ValueError,OSError,TimeoutError,subprocess.CalledProcessError) as exc:
         log(f'ERROR: {exc}');sys.exit(1)

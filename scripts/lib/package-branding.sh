@@ -3,6 +3,7 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$REPO_DIR/scripts/lib/require-builder.sh"
 vigilos_require_builder
+source "$REPO_DIR/scripts/lib/product-version.sh"
 ROOTFS="$(realpath "$1")"
 WORK="$(realpath "$2")/rpmbuild"
 mkdir -p "$WORK"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
@@ -12,11 +13,13 @@ cp "$COMMON" "$ROOTFS/tmp/vigilos-release-common.rpm"
 cp "$ROOTFS/usr/lib/os-release" "$WORK/SOURCES/os-release"
 cp "$ROOTFS/etc/vigilos-release" "$WORK/SOURCES/vigilos-release"
 cp "$ROOTFS/.buildstamp" "$WORK/SOURCES/buildstamp"
+cp "$ROOTFS/usr/lib/vigilos/release.json" "$WORK/SOURCES/release.json"
 printf '44\n' > "$WORK/SOURCES/releasever"
+python3 "$REPO_DIR/scripts/lib/prepare-repository-overrides.py" "$ROOTFS" "$WORK/SOURCES/base-repositories.repo"
 cat > "$WORK/SPECS/vigilos-release-identity.spec" <<'SPEC'
 Name: vigilos-release-identity
-Version: 1.2
-Release: 2%{?dist}
+Version: %{vigilos_version}
+Release: 3%{?dist}
 Summary: VIGIL OS identity on the Fedora 44 base
 License: GPL-3.0-only
 BuildArch: noarch
@@ -24,6 +27,8 @@ Source0: os-release
 Source1: vigilos-release
 Source2: releasever
 Source3: buildstamp
+Source4: base-repositories.repo
+Source5: release.json
 Requires: vigilos-release-common >= 44
 Requires: vigilos-release-common < 45
 Requires: fedora-repos(44)
@@ -32,6 +37,7 @@ Provides: fedora-release-variant = 44
 Provides: fedora-release = 44
 Provides: system-release
 Provides: system-release(44)
+Provides: system-release(releasever) = 44
 Conflicts: fedora-release-variant
 Obsoletes: fedora-release-kde-desktop < 45
 Obsoletes: fedora-release-workstation < 45
@@ -46,13 +52,18 @@ install -Dpm0644 %{SOURCE0} %{buildroot}/usr/lib/os-release
 install -Dpm0644 %{SOURCE1} %{buildroot}/etc/vigilos-release
 install -Dpm0644 %{SOURCE2} %{buildroot}/etc/dnf/vars/releasever
 install -Dpm0644 %{SOURCE3} %{buildroot}/.buildstamp
+install -Dpm0644 %{SOURCE4} %{buildroot}/usr/share/dnf5/repos.override.d/50-vigilos-fedora-base.repo
+install -Dpm0644 %{SOURCE5} %{buildroot}/usr/lib/vigilos/release.json
 %files
+%dir /usr/lib/vigilos
+/usr/lib/vigilos/release.json
 /.buildstamp
 /usr/lib/os-release
 /etc/vigilos-release
 %config(noreplace) /etc/dnf/vars/releasever
+/usr/share/dnf5/repos.override.d/50-vigilos-fedora-base.repo
 SPEC
-rpmbuild --define "_topdir $WORK" -bb "$WORK/SPECS/vigilos-release-identity.spec"
+rpmbuild --define "_topdir $WORK" --define "vigilos_version $VIGIL_VERSION" -bb "$WORK/SPECS/vigilos-release-identity.spec"
 IDENTITY="$(find "$WORK/RPMS" -name 'vigilos-release-identity-*.rpm' -type f | head -1)"
 cp "$IDENTITY" "$ROOTFS/tmp/vigilos-release-identity.rpm"
 chroot "$ROOTFS" dnf -y --releasever=44 install /tmp/vigilos-release-common.rpm /tmp/vigilos-release-identity.rpm
@@ -103,16 +114,16 @@ for rel in "${PATHS[@]}"; do
 done
 cat > "$WORK/SPECS/vigilos-branding.spec" <<'SPEC'
 Name: vigilos-branding
-Version: 1.2
+Version: %{vigilos_version}
 %if 0%{?vigilos_i3}
-Release: 20%{?dist}
+Release: 24%{?dist}
 %else
-Release: 19%{?dist}
+Release: 23%{?dist}
 %endif
 Summary: VIGIL OS desktop and boot branding assets
 License: GPL-3.0-only AND GPL-2.0-or-later AND LGPL-2.0-or-later AND CC-BY-SA-4.0
 BuildArch: noarch
-Requires: vigilos-release-identity = 1.2
+Requires: vigilos-release-identity = %{version}
 Requires: plymouth-theme-spinner
 %if 0%{?vigilos_i3}
 Requires: vigilos-i3-desktop
@@ -130,7 +141,7 @@ candidate RPMs are unsigned development artifacts and are not a public repositor
 cp -a %{_sourcedir}/branding-payload/. %{buildroot}/
 %files -f %{_sourcedir}/branding-files.list
 SPEC
-rpmbuild --define "_topdir $WORK" --define "vigilos_i3 $([[ ${VIGIL_DESKTOP:-kde} == i3 ]] && echo 1 || echo 0)" -bb "$WORK/SPECS/vigilos-branding.spec"
+rpmbuild --define "_topdir $WORK" --define "vigilos_version $VIGIL_VERSION" --define "vigilos_i3 $([[ ${VIGIL_DESKTOP:-kde} == i3 ]] && echo 1 || echo 0)" -bb "$WORK/SPECS/vigilos-branding.spec"
 BRANDING="$(find "$WORK/RPMS" -name 'vigilos-branding-*.rpm' -type f | head -1)"
 cp "$BRANDING" "$ROOTFS/tmp/vigilos-branding.rpm"
 chroot "$ROOTFS" dnf -y --releasever=44 install /tmp/vigilos-branding.rpm /tmp/vigilos-wallpaper-compat.rpm

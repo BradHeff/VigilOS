@@ -1,6 +1,6 @@
 # VIGIL OS project handoff
 
-VIGIL OS 1.2 “Loopback” is a Fedora44-based development distribution with KDE Plasma Wayland and i3 X11 editions. Keep the Loopback codename. The current user goal is a coherent independent product identity while retaining upstream compatibility, provenance and licenses. VpM is a separate native-package-manager design, not implemented production software.
+VIGIL OS is a Fedora44-based development distribution with KDE Plasma Wayland and i3 X11 editions. Product numbering is controlled by `version.json`: the first build number and codename are manual; each real build reserves/increments the second number. Do not change the first number/codename automatically. Numbering was initialized for 1.3 (Loopback); read the current `version.json` rather than assuming the next version. The current user goal is a coherent independent product identity while retaining upstream compatibility, provenance and licenses. VpM is a separate native-package-manager design, not implemented production software.
 
 ## Authoritative build route
 
@@ -11,6 +11,10 @@ All package operations, mounts, chroots and initramfs generation belong inside t
 The user explicitly authorized changing the current host wallpaper to the shared ISO wallpaper. This was applied with a separate backed-up i3 wallpaper-line change, not as part of ISO build execution. Do not broaden that authorization into host package or security changes.
 
 The i3 edition imports sanitized user configs, fonts/licenses, the exact Git prompt helper and relevant local controls. Keep personal exports, fixed monitor assignments, clipboard history and NVIDIA-only bar modules out of shipped defaults. Preserve upstream PAM authentication for the color lock and use the shared wallpaper for desktop/greeter/lock.
+
+## Product version allocation
+
+Read `docs/BUILD.md#version-numbering` and `docs/VERSIONING-2026-10-25.md`. Keep `version.json` outside `.build`, including during clean rebuilds. `--check` never increments it. One invocation reserves one version for both editions after input verification; failed or partial builds retain the reservation to prevent version reuse. Manual larger releases change `build_number` and `codename`; resetting `next_version_number` to 0 makes the first new allocation 2.0 when build_number is 2. Product versions never replace Fedora44 repository/signing compatibility. Both source CDs use immutable per-run metadata. Preserve original1.2 artifacts and their acceptance report: the numbering source change has source/regression validation and is not a new VM-qualified ISO.
 
 ## Current product behavior
 
@@ -25,7 +29,11 @@ The i3 session selects the GTK3 Qt theme bridge and a GTK portal backend, import
 
 ## Evidence and historical notes
 
-Current dark-theme builds and acceptance live in `/home/bheffernan/Documents/Codex/2026-10-22/task/dark-20261023/work`. Read `docs/DARK-THEME-VALIDATION.md`, the actual acceptance and promotion receipts, and evidence before making completion claims. The earlier script-cleanup work in `/home/bheffernan/Documents/Codex/2026-10-22/task/work` and `docs/VALIDATION-2026-10-22.md` remains historical. The source recovery/promotion record is `work/evidence/LATEST-PROMOTION.json`; source parity and original Git preservation must pass before treating the Project checkout as updated. Build logs, private ephemeral keys and VM disks stay outside public source.
+The current three-defect repair and separate clean rebuilds are recorded in `docs/REPAIRED-BUILD-VALIDATION-2026-10-24.md`. Exact accepted artifacts are in `.build/output/repair-20261024T182322Z`; evidence is `/home/bheffernan/Documents/Codex/2026-10-22/task/repair2-20261024/work/evidence`. Both editions passed actual PackageKit refresh, signed native updates, fresh UEFI installation, ISO-free login/reboot/lock, 1024x768/1080p/4K visual checks and BIOS live smoke tests. Hardware and Secure Boot are untested. Preserve the original manual and diagnostic outputs and original manual failure report. Repairs are in this authoritative checkout, not an old lab snapshot.
+
+The identity RPM owns the supported libdnf5 repository override binding release-dependent Fedora URLs/signing-key locations to 44 while preserving upstream repository files and trust settings. Do not replace the allocated VIGIL product VERSION_ID with the Fedora base version. LXPolKit uses native GTK2 dark defaults plus the signed Murrine engine; do not weaken polkit/PAM. Plasma wallpaper defaults use the native new-containment hook (FillMode 1, matching dark matte), not an unused fixed containment ID or a login-time overwrite of saved user layouts.
+
+Earlier dark-theme builds and acceptance live in `/home/bheffernan/Documents/Codex/2026-10-22/task/dark-20261023/work`. Read `docs/DARK-THEME-VALIDATION.md`, the actual acceptance and promotion receipts, and evidence before making completion claims. The earlier script-cleanup work in `/home/bheffernan/Documents/Codex/2026-10-22/task/work` and `docs/VALIDATION-2026-10-22.md` remains historical. The source recovery/promotion record is `work/evidence/LATEST-PROMOTION.json`; source parity and original Git preservation must pass before treating the Project checkout as updated. Build logs, private ephemeral keys and VM disks stay outside public source.
 
 The lab at `/home/bheffernan/Documents/Codex/2026-10-21/task-3/vigil-lab` contains candidate ISOs, exact logs/screenshots, `evidence/ACCEPTANCE.json` and the source change manifest. Do not infer successful tests from historical prose. `docs/VALIDATION-2026-10-21.md` summarizes only actual runs and clearly labels remaining limits. Synchronize final source to `/home/bheffernan/Project/VigilOS` only under a verified scoped backup, preserving original `.git` and the two protected unreadable legacy ISO files; the latest lab promotion record, not this prose, confirms completion.
 

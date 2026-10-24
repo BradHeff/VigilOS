@@ -4,6 +4,7 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$REPO_DIR/scripts/lib/require-builder.sh"
 vigilos_require_builder
+source "$REPO_DIR/scripts/lib/product-version.sh"
 ROOT="$(realpath "$1")"
 WORK="$(realpath "$2")"
 [[ -f "$(dirname "$ROOT")/.vigilos-owned" && "$ROOT" == */squashfs ]] || exit 1
@@ -22,7 +23,7 @@ PY
 cp "$ROOT/usr/share/licenses/f44-backgrounds-base/CC-BY-SA-4.0" "$WORK/SOURCES/wallpaper-compat-LICENSE"
 cat >"$WORK/SPECS/vigilos-wallpaper-compat.spec" <<SPEC
 Name: vigilos-wallpaper-compat
-Version: 1.2
+Version: $VIGIL_VERSION
 Release: 2%{?dist}
 Summary: VIGIL OS KDE wallpaper with Fedora44 dependency compatibility
 License: CC-BY-SA-4.0

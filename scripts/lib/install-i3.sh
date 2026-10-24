@@ -3,12 +3,13 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$REPO_DIR/scripts/lib/require-builder.sh"
 vigilos_require_builder
+source "$REPO_DIR/scripts/lib/product-version.sh"
 ROOT=$(realpath "$1")
 WORK=$(realpath "$2")
 [[ -f "$WORK/.vigilos-owned" && "$ROOT" == "$WORK/squashfs" ]] || exit 2
 ASSETS="$REPO_DIR/branding/i3"
 printf '%s  %s\n' 46f15cbbf339873266e014f70b5e1ec02177f0295302b615a7bd85bef40d8ad2 "$ASSETS/vendor/i3lock-color-2.13.c.5.tar.gz" 80b189fc9ce2e0a56e33be642875f5c3fb53647465f8024a541621307a6a290f "$ASSETS/vendor/greenclip-v4.2" | sha256sum -c -
-chroot "$ROOT" dnf -y --releasever=44 install i3 i3lock lightdm lightdm-gtk polybar rofi xset lxpolkit upower alacritty xclip feh xss-lock dunst thunar mousepad network-manager-applet xdg-desktop-portal xdg-desktop-portal-gtk dbus-tools qt6-qtbase-gui gnome-keyring-pam brightnessctl xinput xrandr xorg-x11-xinit open-sans-fonts xorg-x11-server-Xorg xorg-x11-drv-libinput pipewire-pulseaudio pulseaudio-utils pavucontrol papirus-icon-theme breeze-icon-theme jq slop ffmpeg-free libnotify unzip 7zip
+chroot "$ROOT" dnf -y --releasever=44 install i3 i3lock lightdm lightdm-gtk polybar rofi xset lxpolkit gtk-murrine-engine upower alacritty xclip feh xss-lock dunst thunar mousepad network-manager-applet xdg-desktop-portal xdg-desktop-portal-gtk dbus-tools qt6-qtbase-gui gnome-keyring-pam brightnessctl xinput xrandr xorg-x11-xinit open-sans-fonts xorg-x11-server-Xorg xorg-x11-drv-libinput pipewire-pulseaudio pulseaudio-utils pavucontrol papirus-icon-theme breeze-icon-theme jq slop ffmpeg-free libnotify unzip 7zip
 # Build the pinned upstream color fork in the disposable builder, retaining the
 # signed Fedora i3lock PAM configuration and original i3lock executable.
 LOCK_BINARY=/build/toolchain/i3lock-source/build/i3lock
@@ -45,13 +46,14 @@ cp -a "$ASSETS/appearance/icons" "$PAYLOAD/usr/share/"
 tar -C "$PAYLOAD" -cf "$RPM/SOURCES/payload.tar" .
 cat > "$RPM/SPECS/i3.spec" <<'SPEC'
 Name: vigilos-i3-desktop
-Version: 1.2
-Release: 4%{?dist}
+Version: %{vigilos_version}
+Release: 5%{?dist}
 Summary: VIGIL OS i3 desktop, user theme and pinned upstream utilities
 License: MIT AND BSD-3-Clause AND OFL-1.1
 Source0: payload.tar
 Requires: i3, i3lock, lightdm, lightdm-gtk, polybar, rofi, xset, lxpolkit, alacritty, xclip, breeze-icon-theme, feh, xss-lock, dunst, thunar, brightnessctl, xinput
 Requires: dbus-tools, qt6-qtbase-gui, xdg-desktop-portal, xdg-desktop-portal-gtk
+Requires: gtk-murrine-engine
 Provides: i3lock-color = 2.13.c.5
 %description
 User-requested portable i3 desktop. Greenclip4.2 and i3lock-color2.13.c.5 are
@@ -65,6 +67,7 @@ tar -xf %{SOURCE0} -C %{buildroot}
 %config(noreplace) /etc/skel/.bashrc.d/50-vigilos-i3.sh
 %config(noreplace) /etc/skel/.git-prompt.bash
 %config(noreplace) /etc/skel/.Xresources
+%config(noreplace) /etc/skel/.gtkrc-2.0
 /etc/skel/.config/i3
 /etc/skel/.config/polybar
 /etc/skel/.config/rofi
@@ -83,7 +86,7 @@ tar -xf %{SOURCE0} -C %{buildroot}
 /usr/share/icons/Qogir-white-cursors
 %license /usr/share/licenses/vigilos-i3-desktop
 SPEC
-rpmbuild --define "_topdir $RPM" -bb "$RPM/SPECS/i3.spec"
+rpmbuild --define "_topdir $RPM" --define "vigilos_version $VIGIL_VERSION" -bb "$RPM/SPECS/i3.spec"
 # The editions share a verified Fedora input and branding pipeline, but the i3
 # image does not ship the full Plasma shell or start competing display agents.
 install -Dm0644 "$PAYLOAD/etc/dnf/protected.d/vigilos-i3.conf" "$ROOT/etc/dnf/protected.d/vigilos-i3.conf"
@@ -99,7 +102,9 @@ for guard in "$ROOT/etc/dnf/protected.d/"*.conf; do
 done
 chroot "$ROOT" dnf -y remove --noautoremove plasma-desktop plasma-workspace plasma-welcome sddm sddm-kcm sddm-wayland-plasma
 cp "$RPM"/RPMS/x86_64/*.rpm "$ROOT/tmp/"
-chroot "$ROOT" dnf -y install /tmp/vigilos-i3-desktop-1.2-4.fc44.x86_64.rpm
+I3_RPM="$(find "$RPM/RPMS" -name "vigilos-i3-desktop-${VIGIL_VERSION}-*.rpm" -type f)"
+[[ -n "$I3_RPM" && "$I3_RPM" != *$'\n'* ]] || { echo 'ERROR: Exactly one version-matched i3 RPM required.' >&2; exit 1; }
+chroot "$ROOT" dnf -y install "/tmp/$(basename "$I3_RPM")"
 chroot "$ROOT" rpm -q i3 lightdm anaconda-live anaconda-webui brave-browser libreoffice-core nodejs24 python3 flatpak vigilos-i3-desktop
 chroot "$ROOT" dnf check
 mkdir -p "$ROOT/etc/X11/xinit/Xsession.d" "$ROOT/etc/accountsservice/user-templates" "$ROOT/var/lib/AccountsService/users"

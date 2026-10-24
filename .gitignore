@@ -39,3 +39,6 @@ Thumbs.db
 
 # Private disposable build state and ephemeral SSH keys
 .build/
+
+# Checkout-wide build/version lock; the persistent counter is version.json
+.vigil-build.lock

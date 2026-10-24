@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Static, unprivileged validation; never executes build code."""
-import ast, configparser, hashlib, json, os, re, shutil, struct, subprocess, tempfile, tomllib
+import ast, configparser, hashlib, json, os, re, runpy, shutil, struct, subprocess, tempfile, tomllib
 from pathlib import Path
+import sys
+sys.dont_write_bytecode=True
+from version import load_config, source_release
 root=Path(__file__).resolve().parents[2]
-required=['scripts/build-and-brand.sh','scripts/lib/build.py','scripts/lib/build-guest.sh','scripts/lib/remix.sh','scripts/lib/install-i3.sh','scripts/lib/guest-setup.sh','branding/logos/source/vigil-mark.svg','branding/i3/skel/.git-prompt.bash','branding/i3/fonts/Feather-LICENSE','branding/i3/rofi-LICENSE']
+required=['scripts/build-and-brand.sh','scripts/lib/build.py','version.json','scripts/lib/version.py','scripts/lib/product-version.sh','scripts/lib/prepare-release.py','scripts/lib/test-versioning.py','scripts/lib/build-guest.sh','scripts/lib/remix.sh','scripts/lib/install-i3.sh','scripts/lib/guest-setup.sh','branding/logos/source/vigil-mark.svg','branding/i3/skel/.git-prompt.bash','branding/i3/fonts/Feather-LICENSE','branding/i3/rofi-LICENSE']
 for name in required:assert (root/name).is_file(),f'Missing {name}'
 for directory in [root/'scripts',root/'branding/i3/bin']:
     for path in directory.rglob('*'):
@@ -11,7 +14,12 @@ for directory in [root/'scripts',root/'branding/i3/bin']:
         if path.suffix=='.py' or path.read_bytes().startswith((b'#!/usr/bin/python3',b'#!/usr/bin/env python3')):ast.parse(path.read_text(),filename=str(path))
         elif path.read_bytes().startswith((b'#!/bin/bash',b'#!/usr/bin/env bash',b'#!/usr/bin/bash',b'#!/bin/sh',b'#!/usr/bin/env sh')):
             subprocess.run(['bash','-n',path],check=True)
-print('PASS: shell syntax and Python AST')
+version_config=load_config(root/'version.json')
+release=source_release(root)
+if (root/'release.json').exists():
+    assert version_config['build_number']==release.build_number and version_config['codename']==release.codename
+    assert version_config['next_version_number']==release.version_number+1
+print(f'PASS: shell syntax, Python AST and version metadata ({release.version}, {release.codename})')
 assets=root/'branding/i3'
 for relative,digest in {'vendor/greenclip-v4.2':'80b189fc9ce2e0a56e33be642875f5c3fb53647465f8024a541621307a6a290f','vendor/i3lock-color-2.13.c.5.tar.gz':'46f15cbbf339873266e014f70b5e1ec02177f0295302b615a7bd85bef40d8ad2'}.items():assert hashlib.sha256((assets/relative).read_bytes()).hexdigest()==digest,relative
 wallpaper=root/'branding/wallpapers/VIGILOS/contents/images/3840x2160.png'
@@ -45,6 +53,22 @@ for profile in ['Skel','branding/i3/skel']:
         cfg=configparser.ConfigParser();cfg.read(root/profile/f'.config/gtk-{version}.0/settings.ini')
         assert cfg.getboolean('Settings','gtk-application-prefer-dark-theme')
 print('PASS: pinned vendor inputs, preserved user dark artwork, aspect-safe defaults and login contrast')
+gtk2=(assets/'skel/.gtkrc-2.0').read_text()
+assert 'gtk-theme-name="VALYRIAN-Total-Steel"' in gtk2
+assert 'Requires: gtk-murrine-engine' in (root/'scripts/lib/install-i3.sh').read_text()
+wallpaper_setup=(root/'scripts/runtime/vigilos-wallpaper-default.js').read_text()
+assert 'containment.writeConfig("FillMode", 1)' in wallpaper_setup
+assert 'containment.writeConfig("Color", "#1e1e1e")' in wallpaper_setup
+assert "d/'org.kde.plasma.folder.js'" in (root/'scripts/lib/prepare-desktop-defaults.py').read_text()
+overrides=runpy.run_path(str(root/'scripts/lib/prepare-repository-overrides.py'))['repository_overrides']
+sample='[fedora]\nname=Fedora $releasever\nmetalink=https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever&arch=$basearch\ngpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-${releasever}-$basearch\ngpgcheck=1\nsslverify=1\nenabled=1\n[updates]\nmetalink=https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch\n'
+repo_cfg=configparser.ConfigParser(interpolation=None);repo_cfg.read_string(overrides({'fedora.repo':sample}))
+assert 'fedora-44&arch=$basearch' in repo_cfg['fedora']['metalink']
+assert repo_cfg['fedora']['gpgkey'].endswith('fedora-44-$basearch')
+assert 'updates-released-f44&arch=$basearch' in repo_cfg['updates']['metalink']
+assert not any(k in repo_cfg['fedora'] for k in ['enabled','gpgcheck','sslverify','skip_if_unavailable'])
+assert 'system-release(releasever) = 44' in (root/'scripts/lib/package-branding.sh').read_text()
+print('PASS: Fedora base URL/key overrides preserve native security settings, GTK2 engine/default and uncropped desktop defaults')
 config=assets/'skel/.config/i3/config';text=config.read_text()
 assert not re.search(r'^\s*#',text,re.M),'Commented lines remain in shipped i3 config'
 for directory in [assets/'skel',assets/'bin']:
@@ -80,3 +104,9 @@ for path in (assets/'appearance').rglob('*'):
     if path.is_symlink():
         assert not os.readlink(path).startswith('/home/'),f'Personal theme symlink: {path}'
 print('PASS: imported appearance assets have no personal-home symlink targets')
+
+subprocess.run([sys.executable,root/'scripts/lib/test-versioning.py'],check=True)
+print('PASS: automatic version allocation, persistence, concurrency, frozen source media and generated product identity')
+result=subprocess.run([sys.executable,root/'scripts/lib/prepare-release.py'],env={**os.environ,'VIGIL_BUILD_GUEST':'0'},capture_output=True,text=True,timeout=10)
+assert result.returncode!=0 and 'approved disposable builder' in result.stderr
+print('PASS: product metadata renderer refuses host execution')

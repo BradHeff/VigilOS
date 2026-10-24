@@ -9,16 +9,17 @@ set -euo pipefail
 BUILD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$BUILD_DIR/scripts/lib/require-builder.sh"
 vigilos_require_builder
+source "$BUILD_DIR/scripts/lib/product-version.sh"
 BRANDING_DIR="$BUILD_DIR/branding"
 PLASMA_CFG_DIR="$BUILD_DIR/PLASMA-CONFIGS"
 SKEL_DIR="$BUILD_DIR/Skel"
 WORK_DIR="$(mktemp -d "${VIGIL_WORK_ROOT:-/var/tmp}/vigilos-branding.XXXXXX")"
 DESKTOP="${VIGIL_DESKTOP:-kde}"
 [[ "$DESKTOP" == kde || "$DESKTOP" == i3 ]] || exit 2
-ISO_LABEL_DEFAULT="VIGILOS-1-2-${DESKTOP}-x86_64"
+ISO_LABEL_DEFAULT="VIGILOS-${VIGIL_VERSION//./-}-${DESKTOP}-x86_64"
 
 input_iso="${1:-}"
-output_iso="${2:-$BUILD_DIR/VIGILOS-1.2-x86_64.iso}"
+output_iso="${2:-$BUILD_DIR/VIGILOS-${VIGIL_VERSION}-${DESKTOP}-x86_64.iso}"
 # Absolutize paths now: the script cd's into $WORK_DIR later, so a relative
 # output name would otherwise drop the ISO inside the work directory.
 input_iso="$(readlink -f "$input_iso")"
@@ -1140,26 +1141,10 @@ Theme=VIGIL-Dark-Splash
 Engine=KSplashQML
 KSPLASH
 
-# Create desktop wallpaper config for Plasma 6
-# Use multiple approaches to ensure wallpaper is applied
-echo "  - Setting VIGILOS wallpaper as default..."
-
-# Method 1: Desktop containment config
-sudo tee "$ROOTFS_DIR/etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc" > /dev/null << 'PLASMADESKTOP'
-[Containments][1]
-activityId=
-formfactor=0
-immutability=1
-lastScreen=0
-location=0
-plugin=org.kde.plasma.folder
-wallpaperplugin=org.kde.image
-
-[Containments][1][Wallpaper][org.kde.image][General]
-Image=/usr/share/wallpapers/F44/
-PreviewImage=/usr/share/vigilos/wallpapers/VIGILOS/contents/images/3840x2160.png
-SlidePaths=/usr/share/wallpapers/
-PLASMADESKTOP
+# Plasma creates activity-specific desktops on first boot. The product native
+# containment-creation hook sets aspect-fit defaults for each actual desktop.
+# Do not seed a fixed containment ID with an invalid empty activity.
+sudo rm -f "$ROOTFS_DIR/etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc" "$ROOTFS_DIR/home/liveuser/.config/plasma-org.kde.plasma.desktop-appletsrc"
 
 # A minimal product look-and-feel selects wallpaper without replacing panel layouts
 # or modifying the upstream plasma-desktop shell-defaults file.
@@ -1181,7 +1166,6 @@ if [[ -d "$ROOTFS_DIR/home/liveuser" ]]; then
     sudo cp "$ROOTFS_DIR/etc/skel/.config/kcminputrc" "$ROOTFS_DIR/home/liveuser/.config/"
     sudo cp "$ROOTFS_DIR/etc/skel/.config/kwinrc" "$ROOTFS_DIR/home/liveuser/.config/"
     sudo cp "$ROOTFS_DIR/etc/skel/.config/ksplashrc" "$ROOTFS_DIR/home/liveuser/.config/"
-    sudo cp "$ROOTFS_DIR/etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc" "$ROOTFS_DIR/home/liveuser/.config/"
     sudo cp "$ROOTFS_DIR/etc/skel/.config/konsolerc" "$ROOTFS_DIR/home/liveuser/.config/" 2>/dev/null || true
 
     # Copy GTK configs too
@@ -1335,51 +1319,9 @@ fi
 echo ""
 echo "=== Applying OS Branding ==="
 
-# Canonical os-release lives in /usr/lib (shipped by fedora-release). We MUST
-# overwrite it there, not just /etc, or systemd tooling that reads the canonical
-# /usr/lib/os-release will still report "Fedora". /etc/os-release then points to it.
-sudo mkdir -p "$ROOTFS_DIR/usr/lib"
-sudo tee "$ROOTFS_DIR/usr/lib/os-release" > /dev/null << 'EOF'
-NAME="VIGIL OS"
-VERSION="1.2 (Loopback)"
-ID=vigilos
-ID_LIKE=fedora
-VERSION_ID=1.2
-VERSION_CODENAME=loopback
-PRETTY_NAME="VIGIL OS 1.2 (Loopback)"
-ANSI_COLOR="0;38;2;129;212;250"
-LOGO=vigilos-logo
-CPE_NAME="cpe:/o:vigilos:vigilos:1.2"
-VARIANT="KDE Plasma"
-VARIANT_ID=kde
-HOME_URL="https://vigilglm.ai"
-DOCUMENTATION_URL="https://docs.vigilglm.ai"
-SUPPORT_URL="https://support.vigilglm.ai"
-BUG_REPORT_URL="https://github.com/vigilglm/vigilos/issues"
-PRIVACY_POLICY_URL="https://vigilglm.ai/privacy"
-DEVELOPER="Brad Heffernan"
-EOF
-if [[ "$DESKTOP" == i3 ]]; then
-    sudo sed -i 's/^VARIANT=.*/VARIANT="i3"/;s/^VARIANT_ID=.*/VARIANT_ID=i3/' "$ROOTFS_DIR/usr/lib/os-release"
-fi
-# /etc/os-release is conventionally a relative symlink to the canonical file.
-sudo ln -sf ../usr/lib/os-release "$ROOTFS_DIR/etc/os-release"
-
-# Keep Fedora-owned /etc/system-release and /usr/lib/fedora-release as base compatibility metadata.
-echo "VIGIL OS release 1.2 (Loopback)" | sudo tee "$ROOTFS_DIR/etc/vigilos-release" > /dev/null
-
-# Console login banners (otherwise inherited from fedora-release / setup pkgs).
-sudo rm -f "$ROOTFS_DIR/etc/issue" "$ROOTFS_DIR/etc/issue.net"
-printf 'VIGIL OS 1.2 (Loopback) \\r (\\l)\n\n' | sudo tee "$ROOTFS_DIR/etc/issue" > /dev/null
-printf 'VIGIL OS 1.2 (Loopback)\n' | sudo tee "$ROOTFS_DIR/etc/issue.net" > /dev/null
-
-sudo tee "$ROOTFS_DIR/etc/lsb-release" > /dev/null << 'EOF'
-DISTRIB_ID="VIGIL OS"
-DISTRIB_RELEASE=1.2
-DISTRIB_CODENAME=loopback
-DISTRIB_DESCRIPTION="VIGIL OS 1.2 (Loopback)"
-DISTRIB_DEVELOPER="Brad Heffernan"
-EOF
+# Use the immutable per-run allocation for OS identity, banners, installer stamp
+# and the copied live/installed GRUB themes. Fedora package-base identity stays44.
+sudo env VIGIL_BUILD_GUEST=1 VIGIL_DESKTOP="$DESKTOP" python3 "$BUILD_DIR/scripts/lib/prepare-release.py" "$ROOTFS_DIR"
 
 # ============================================
 # ANACONDA INSTALLER PROFILE  (bootloader-install fix)
@@ -1414,14 +1356,7 @@ webui_web_engine = /usr/local/libexec/vigilos-anaconda-browser
 custom_stylesheet = /usr/share/vigilos/anaconda/vigilos.css
 EOF
 
-# Anaconda reads product/version from /.buildstamp independently of os-release.
-sudo python3 - "$ROOTFS_DIR/.buildstamp" <<'BUILDSTAMP_PY'
-import configparser,pathlib,sys
-p=pathlib.Path(sys.argv[1]);c=configparser.ConfigParser();c.read(p)
-if not c.has_section('Main'):c.add_section('Main')
-c['Main']['Product']='VIGIL OS';c['Main']['Version']='1.2';c['Main']['IsFinal']='False'
-with p.open('w') as f:c.write(f)
-BUILDSTAMP_PY
+# /.buildstamp was rendered from the same allocated release above.
 sudo mkdir -p "$ROOTFS_DIR/usr/share/vigilos/anaconda"
 sudo tee "$ROOTFS_DIR/usr/share/vigilos/anaconda/vigilos.css" >/dev/null <<'INSTALLER_CSS'
 /* VIGIL OS product styling; upstream Anaconda notices remain intact. */
