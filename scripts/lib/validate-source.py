@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Static, unprivileged validation; never executes build code."""
-import ast, hashlib, os, re, shutil, subprocess, tempfile, tomllib
+import ast, configparser, hashlib, json, os, re, shutil, struct, subprocess, tempfile, tomllib
 from pathlib import Path
 root=Path(__file__).resolve().parents[2]
 required=['scripts/build-and-brand.sh','scripts/lib/build.py','scripts/lib/build-guest.sh','scripts/lib/remix.sh','scripts/lib/install-i3.sh','scripts/lib/guest-setup.sh','branding/logos/source/vigil-mark.svg','branding/i3/skel/.git-prompt.bash','branding/i3/fonts/Feather-LICENSE','branding/i3/rofi-LICENSE']
@@ -14,10 +14,37 @@ for directory in [root/'scripts',root/'branding/i3/bin']:
 print('PASS: shell syntax and Python AST')
 assets=root/'branding/i3'
 for relative,digest in {'vendor/greenclip-v4.2':'80b189fc9ce2e0a56e33be642875f5c3fb53647465f8024a541621307a6a290f','vendor/i3lock-color-2.13.c.5.tar.gz':'46f15cbbf339873266e014f70b5e1ec02177f0295302b615a7bd85bef40d8ad2'}.items():assert hashlib.sha256((assets/relative).read_bytes()).hexdigest()==digest,relative
-wallpaper=root/'branding/wallpapers/VIGILOS/contents/images/1672x941.png'
-assert hashlib.sha256(wallpaper.read_bytes()).hexdigest()=='58f1ea66fc85ad7fa71358fb6e20ee78587600985bae92319b08d7bd078218ca'
+wallpaper=root/'branding/wallpapers/VIGILOS/contents/images/3840x2160.png'
+assert hashlib.sha256(wallpaper.read_bytes()).hexdigest()=='de5f2e826828bde96f19ea936ffc3caada822692e4ff5c86c0930645b29be2b0'
 assert wallpaper.stat().st_mode & 0o444 == 0o444
-print('PASS: pinned vendor inputs and shared VIGIL wallpaper')
+manifest=json.loads((root/'branding/wallpapers/dark-assets.json').read_text())
+for name,info in manifest['variants'].items():
+    for path in [root/'branding/wallpapers'/name,wallpaper.parent/name.removeprefix('VIGIL-')]:
+        data=path.read_bytes()
+        assert hashlib.sha256(data).hexdigest()==info['sha256'],path
+        assert struct.unpack('>II',data[16:24])==(info['width'],info['height']),path
+assert not (wallpaper.parent/'1672x941.png').exists(),'Old city must not remain an active wallpaper choice'
+for folder in ['PLASMA-CONFIGS/VIGILOS-SDDM','branding/sddm/vigilos']:
+    assert hashlib.sha256((root/folder/'background.png').read_bytes()).hexdigest()==manifest['preserved_sddm']['sha256']
+    cfg=configparser.ConfigParser();cfg.read(root/folder/'theme.conf');colors=cfg['General']
+    def lightness(color):
+        rgb=[int(color[i:i+2],16)/255 for i in (1,3,5)]
+        linear=[v/12.92 if v<=0.04045 else ((v+0.055)/1.055)**2.4 for v in rgb]
+        return sum(v*w for v,w in zip(linear,[.2126,.7152,.0722]))
+    for foreground,background in [(colors['input_text_color'],colors['input_background']),(colors['placeholder_color'],colors['input_background']),(colors['color'],'#1e1e1e'),('#ffffff','#315cb9')]:
+        a,b=sorted([lightness(foreground),lightness(background)])
+        assert (b+.05)/(a+.05)>=4.5,(folder,foreground,background)
+    assert 'Image.PreserveAspectFit' in (root/folder/'Main.qml').read_text()
+defaults=(root/'branding/desktop-defaults/defaults').read_text()
+for value in ['ColorScheme=VIGILDark','name=PurPurNight-Plasma','Theme=VIGIL-Dark-Splash']:
+    assert value in defaults,value
+assert 'desktop-image-scale-method: "padding"' in (root/'branding/grub/vigilos/theme.txt').read_text()
+assert '--max --color=1e1e1e' in (root/'branding/i3/bin/lock').read_text()
+for profile in ['Skel','branding/i3/skel']:
+    for version in ['3','4']:
+        cfg=configparser.ConfigParser();cfg.read(root/profile/f'.config/gtk-{version}.0/settings.ini')
+        assert cfg.getboolean('Settings','gtk-application-prefer-dark-theme')
+print('PASS: pinned vendor inputs, preserved user dark artwork, aspect-safe defaults and login contrast')
 config=assets/'skel/.config/i3/config';text=config.read_text()
 assert not re.search(r'^\s*#',text,re.M),'Commented lines remain in shipped i3 config'
 for directory in [assets/'skel',assets/'bin']:

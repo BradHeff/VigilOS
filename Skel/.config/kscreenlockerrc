@@ -1,3 +1,5 @@
 [Greeter][Wallpaper][org.kde.image][General]
-Image=file:///usr/share/vigilos/wallpapers/VIGILOS/contents/images/1672x941.png
-PreviewImage=file:///usr/share/vigilos/wallpapers/VIGILOS/contents/images/1672x941.png
+Image=file:///usr/share/vigilos/wallpapers/VIGILOS/contents/images/3840x2160.png
+PreviewImage=file:///usr/share/vigilos/wallpapers/VIGILOS/contents/images/3840x2160.png
+FillMode=1
+Color=30,30,30

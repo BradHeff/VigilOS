@@ -8,11 +8,11 @@ assert Path('/etc/vigilos-disposable-builder').is_file()
 assert (root.parent/'.vigilos-owned').is_file() and root.name=='squashfs'
 subprocess.run(['systemd-detect-virt','--vm','--quiet'],check=True)
 base=root/'usr/share/plasma/look-and-feel'
-previews=assets/'plasma-themes/PurPurDay-Global-6/contents/previews'
+# No stale light/city previews: actual new captures are retained in acceptance evidence.
 product=base/'org.vigilos.desktop';(product/'contents').mkdir(parents=True,exist_ok=True)
-(product/'metadata.json').write_text(json.dumps({'KPackageStructure':'Plasma/LookAndFeel','KPlugin':{'Id':'org.vigilos.desktop','Name':'VIGIL OS','Description':'VIGIL OS desktop defaults','Version':'1.2','License':'GPL-3.0-only','Authors':[{'Name':'VIGIL OS maintainers'}]}},indent=2)+'\n')
+(product/'metadata.json').write_text(json.dumps({'KPackageStructure':'Plasma/LookAndFeel','KPlugin':{'Id':'org.vigilos.desktop','Name':'VIGIL Dark','Description':'VIGIL OS dark desktop defaults','Version':'1.2','License':'GPL-3.0-only','Authors':[{'Name':'VIGIL OS maintainers'}]}},indent=2)+'\n')
 shutil.copy2(assets/'desktop-defaults/defaults',product/'contents/defaults')
-shutil.copytree(previews,product/'contents/previews',dirs_exist_ok=True)
+(product/'contents/previews').mkdir(exist_ok=True)
 def install_launcher_default(package):
  d=package/'contents/plasmoidsetupscripts';d.mkdir(parents=True,exist_ok=True)
  shutil.copy2(Path(__file__).parent.parent/'runtime/vigilos-kickoff-default.js',d/'org.kde.plasma.kickoff.js')
@@ -21,7 +21,7 @@ install_launcher_default(product)
 # only these compatibility packages, retaining their IDs/authors/licenses and
 # ordinary upstream RPM update/verification paths underneath.
 overlays=root/'usr/local/share/plasma/look-and-feel'
-for suffix,label in [('fedora','VIGIL Classic'),('fedoradark','VIGIL Dark'),('fedoralight','VIGIL Light')]:
+for suffix,label in [('fedora','VIGIL Dark Classic'),('fedoradark','VIGIL Dark'),('fedoralight','VIGIL Dark Compatibility')]:
  ident=f'org.fedoraproject.{suffix}.desktop';src=base/ident
  assert src.is_dir(),src
  dest=overlays/ident;shutil.copytree(src,dest,dirs_exist_ok=True)
@@ -31,17 +31,17 @@ for suffix,label in [('fedora','VIGIL Classic'),('fedoradark','VIGIL Dark'),('fe
  for key in list(meta['KPlugin']):
   if key.startswith(('Name[','Description[')):del meta['KPlugin'][key]
  (dest/'metadata.json').write_text(json.dumps(meta,indent=2,ensure_ascii=False)+'\n')
- p=dest/'contents/defaults';cfg=configparser.ConfigParser(interpolation=None);cfg.optionxform=str;cfg.read_string(p.read_text())
+ p=dest/'contents/defaults';cfg=configparser.ConfigParser(interpolation=None);cfg.optionxform=str;cfg.read_string((assets/'desktop-defaults/defaults').read_text())
  cfg['Wallpaper']['Image']='F44'
  group='ksplashrc][KSplash'
  if not cfg.has_section(group):cfg.add_section(group)
- cfg[group]['Theme']='PurPurDay-Splash-6'
+ cfg[group]['Theme']='VIGIL-Dark-Splash'
  stream=io.StringIO();cfg.write(stream,space_around_delimiters=False);p.write_text(stream.getvalue())
  install_launcher_default(dest)
  old=dest/'contents/previews'
  # These are copies in the product-owned overlay, never upstream originals.
  for f in old.iterdir():
   if f.is_file():f.unlink()
- shutil.copytree(previews,old,dirs_exist_ok=True)
- (dest/'VIGIL-CHANGES.txt').write_text('Product XDG overlay: VIGIL display names, wallpaper defaults and actual VIGIL preview captures. Upstream package IDs, authors, notices and other files retained. Original signed RPM files remain unchanged under /usr/share.\n')
+ # Authentic captures are stored with validation, never replaced by old previews.
+ (dest/'VIGIL-CHANGES.txt').write_text('Product XDG overlay: VIGIL dark defaults and wallpaper. Old previews omitted; authentic captures are retained with acceptance evidence. Upstream package IDs, authors, notices and other files retained. Original signed RPM files remain unchanged under /usr/share.\n')
 print('Product-owned default and three compatibility theme overlays prepared; upstream core RPM content untouched.')

@@ -1,2 +1,2 @@
 #!/usr/bin/env sh
-exec feh --no-fehbg --bg-fill /usr/share/vigilos/wallpapers/VIGILOS/contents/images/1672x941.png
+exec feh --no-fehbg --image-bg "#1e1e1e" --bg-max /usr/share/vigilos/wallpapers/VIGILOS/contents/images/3840x2160.png

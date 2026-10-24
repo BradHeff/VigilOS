@@ -55,12 +55,14 @@ Item {
         connectedSources: "Caps Lock"
     }
 
+    Rectangle { anchors.fill: parent; color: "#1e1e1e" }
+
     Image {
         id: wallpaper
         height: parent.height
         width: parent.width
         source: config.background || config.Background
-        fillMode: Image.PreserveAspectCrop
+        fillMode: Image.PreserveAspectFit
         asynchronous: true
         cache: true
         clip: true

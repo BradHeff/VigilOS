@@ -8,7 +8,7 @@ WORK=$(realpath "$2")
 [[ -f "$WORK/.vigilos-owned" && "$ROOT" == "$WORK/squashfs" ]] || exit 2
 ASSETS="$REPO_DIR/branding/i3"
 printf '%s  %s\n' 46f15cbbf339873266e014f70b5e1ec02177f0295302b615a7bd85bef40d8ad2 "$ASSETS/vendor/i3lock-color-2.13.c.5.tar.gz" 80b189fc9ce2e0a56e33be642875f5c3fb53647465f8024a541621307a6a290f "$ASSETS/vendor/greenclip-v4.2" | sha256sum -c -
-chroot "$ROOT" dnf -y --releasever=44 install i3 i3lock lightdm lightdm-gtk polybar rofi xset lxpolkit upower alacritty xclip feh xss-lock dunst thunar mousepad network-manager-applet xdg-desktop-portal-gtk gnome-keyring-pam brightnessctl xinput xrandr xorg-x11-xinit open-sans-fonts xorg-x11-server-Xorg xorg-x11-drv-libinput pipewire-pulseaudio pulseaudio-utils pavucontrol papirus-icon-theme breeze-icon-theme jq slop ffmpeg-free libnotify unzip 7zip
+chroot "$ROOT" dnf -y --releasever=44 install i3 i3lock lightdm lightdm-gtk polybar rofi xset lxpolkit upower alacritty xclip feh xss-lock dunst thunar mousepad network-manager-applet xdg-desktop-portal xdg-desktop-portal-gtk dbus-tools qt6-qtbase-gui gnome-keyring-pam brightnessctl xinput xrandr xorg-x11-xinit open-sans-fonts xorg-x11-server-Xorg xorg-x11-drv-libinput pipewire-pulseaudio pulseaudio-utils pavucontrol papirus-icon-theme breeze-icon-theme jq slop ffmpeg-free libnotify unzip 7zip
 # Build the pinned upstream color fork in the disposable builder, retaining the
 # signed Fedora i3lock PAM configuration and original i3lock executable.
 LOCK_BINARY=/build/toolchain/i3lock-source/build/i3lock
@@ -29,6 +29,8 @@ X-LightDM-DesktopName=i3
 DesktopNames=i3
 SESSION
 cp -a "$ASSETS/skel/." "$PAYLOAD/etc/skel/"
+install -Dm0644 "$ASSETS/session/vigilos-i3-session.target" "$PAYLOAD/usr/lib/systemd/user/vigilos-i3-session.target"
+install -Dm0644 "$ASSETS/session/i3-portals.conf" "$PAYLOAD/usr/share/xdg-desktop-portal/i3-portals.conf"
 cp -a "$ASSETS/bin/." "$PAYLOAD/usr/local/bin/"
 cp -a "$ASSETS/icons" "$PAYLOAD/usr/local/bin/"
 install -m0755 "$LOCK_BINARY" "$PAYLOAD/usr/bin/i3lock-color"
@@ -44,11 +46,12 @@ tar -C "$PAYLOAD" -cf "$RPM/SOURCES/payload.tar" .
 cat > "$RPM/SPECS/i3.spec" <<'SPEC'
 Name: vigilos-i3-desktop
 Version: 1.2
-Release: 2%{?dist}
+Release: 4%{?dist}
 Summary: VIGIL OS i3 desktop, user theme and pinned upstream utilities
 License: MIT AND BSD-3-Clause AND OFL-1.1
 Source0: payload.tar
 Requires: i3, i3lock, lightdm, lightdm-gtk, polybar, rofi, xset, lxpolkit, alacritty, xclip, breeze-icon-theme, feh, xss-lock, dunst, thunar, brightnessctl, xinput
+Requires: dbus-tools, qt6-qtbase-gui, xdg-desktop-portal, xdg-desktop-portal-gtk
 Provides: i3lock-color = 2.13.c.5
 %description
 User-requested portable i3 desktop. Greenclip4.2 and i3lock-color2.13.c.5 are
@@ -73,6 +76,8 @@ tar -xf %{SOURCE0} -C %{buildroot}
 /usr/local/bin/*
 /usr/share/fonts/vigilos-i3
 /usr/share/xsessions/vigilos-i3.desktop
+/usr/lib/systemd/user/vigilos-i3-session.target
+/usr/share/xdg-desktop-portal/i3-portals.conf
 /usr/share/themes/VALYRIAN-Total-Steel
 /usr/share/icons/Slot-Beauty-Dark-Icons
 /usr/share/icons/Qogir-white-cursors
@@ -94,7 +99,7 @@ for guard in "$ROOT/etc/dnf/protected.d/"*.conf; do
 done
 chroot "$ROOT" dnf -y remove --noautoremove plasma-desktop plasma-workspace plasma-welcome sddm sddm-kcm sddm-wayland-plasma
 cp "$RPM"/RPMS/x86_64/*.rpm "$ROOT/tmp/"
-chroot "$ROOT" dnf -y install /tmp/vigilos-i3-desktop-1.2-2.fc44.x86_64.rpm
+chroot "$ROOT" dnf -y install /tmp/vigilos-i3-desktop-1.2-4.fc44.x86_64.rpm
 chroot "$ROOT" rpm -q i3 lightdm anaconda-live anaconda-webui brave-browser libreoffice-core nodejs24 python3 flatpak vigilos-i3-desktop
 chroot "$ROOT" dnf check
 mkdir -p "$ROOT/etc/X11/xinit/Xsession.d" "$ROOT/etc/accountsservice/user-templates" "$ROOT/var/lib/AccountsService/users"
@@ -108,7 +113,7 @@ CONF
 # %config(noreplace) file normally, retaining ownership in lightdm-gtk.
 cat > "$ROOT/etc/lightdm/lightdm-gtk-greeter.conf" <<'CONF'
 [greeter]
-background=/usr/share/vigilos/wallpapers/VIGILOS/contents/images/1672x941.png
+background=/usr/share/vigilos/wallpapers/VIGILOS/contents/images/3840x2160.png
 user-background=false
 theme-name=VALYRIAN-Total-Steel
 icon-theme-name=Slot-Beauty-Dark-Icons

@@ -10,8 +10,7 @@ padding=4
 Scale=1
 
 [org.kde.kdecoration2]
-library=org.kde.kwin.aurorae
-theme=__aurorae__svg__PurPurDayBlur-Aurorae-6
+library=org.kde.breeze
 
 [DesktopSwitcher]
 LayoutName=org.kde.breeze.desktop

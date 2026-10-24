@@ -1,0 +1,31 @@
+{
+  "description": "User-supplied dark faded-mark project artwork; original production/upscale history is unknown",
+  "canonical": "3840x2160.png",
+  "variants": {
+    "VIGIL-1920x1080.png": {
+      "sha256": "74270b4fed6e98e9088322e44a0b69afb89d3bdaa756ec5cf0671b3821e1145b",
+      "width": 1920,
+      "height": 1080
+    },
+    "VIGIL-2560x1600.png": {
+      "sha256": "dfbc3e55d0cb520abcc230058640b978c04e0dfe1d485390fedba3d214275c69",
+      "width": 2560,
+      "height": 1600
+    },
+    "VIGIL-3440x1440.png": {
+      "sha256": "85730021b51770434b31ea3e9df7471aeb01024ce15df6482e7b21fe2f0079f4",
+      "width": 3440,
+      "height": 1440
+    },
+    "VIGIL-3840x2160.png": {
+      "sha256": "de5f2e826828bde96f19ea936ffc3caada822692e4ff5c86c0930645b29be2b0",
+      "width": 3840,
+      "height": 2160
+    }
+  },
+  "preserved_sddm": {
+    "sha256": "1c6aedd926a6e55b10023771faff28589e8de47d6f42bd9a87a56bf1b8658d0d",
+    "width": 1920,
+    "height": 1080
+  }
+}

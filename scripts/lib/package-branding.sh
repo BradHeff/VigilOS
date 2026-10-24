@@ -64,7 +64,11 @@ cp "$WALLPAPER" "$ROOTFS/tmp/vigilos-wallpaper-compat.rpm"
 # These product-specific paths do not replace Fedora-owned theme/icon assets.
 PAYLOAD="$WORK/SOURCES/branding-payload"
 mkdir -p "$PAYLOAD"
-PATHS=(etc/vigilos-desktop etc/skel/.config/kcm-about-distrorc etc/skel/.config/kdeglobals etc/skel/.config/mimeapps.list etc/yum.repos.d/brave-browser.repo etc/pki/rpm-gpg/RPM-GPG-KEY-brave-release usr/local/libexec/vigilos-anaconda-browser etc/skel/.config/kscreenlockerrc usr/share/color-schemes/PurPurDayColor.colors usr/share/plasma/desktoptheme/PurPurDay-Plasma usr/share/plasma/look-and-feel/PurPurDay-Global-6 usr/share/plasma/look-and-feel/PurPurDay-Splash-6 usr/share/plasma/look-and-feel/org.vigilos.desktop usr/local/share/plasma/look-and-feel usr/local/libexec/vigilos-configure-installed-boot usr/share/plasma/plasma-welcome/intro-customization.desktop etc/skel/.config/autostart/imsettings-start.desktop usr/local/share/applications/liveinst.desktop usr/share/cockpit/branding/vigilos usr/share/vigilos usr/share/grub/themes/vigilos usr/share/sddm/themes/vigilos usr/share/plymouth/themes/vigilos usr/share/plymouth/themes/vigilos-spinner usr/lib/dracut/modules.d/99vigilos-branding etc/anaconda/profile.d/vigilos.conf etc/sddm.conf.d/vigilos.conf usr/local/libexec/vigilos-is-live usr/local/libexec/vigilos-liveuser-setup usr/local/bin/vigilos-first-boot.sh etc/systemd/system/vigilos-first-boot.service etc/systemd/system/sddm-live-autologin.service etc/systemd/system/liveuser-setup.service etc/systemd/system/vigilos-gpu-setup.service usr/local/bin/vigilos-gpu-setup.sh usr/local/bin/vigilos-gpu-notify.sh etc/dracut.conf.d/vigilos-branding.conf)
+PATHS=(etc/vigilos-desktop etc/skel/.config/kcm-about-distrorc etc/skel/.config/kdeglobals etc/skel/.config/mimeapps.list etc/yum.repos.d/brave-browser.repo etc/pki/rpm-gpg/RPM-GPG-KEY-brave-release usr/local/libexec/vigilos-anaconda-browser etc/skel/.config/kscreenlockerrc usr/share/color-schemes/VIGILDark.colors usr/share/plasma/desktoptheme/PurPurNight-Plasma usr/share/plasma/look-and-feel/VIGIL-Dark-Splash usr/share/plasma/look-and-feel/org.vigilos.desktop usr/local/share/plasma/look-and-feel usr/local/libexec/vigilos-configure-installed-boot usr/share/plasma/plasma-welcome/intro-customization.desktop etc/skel/.config/autostart/imsettings-start.desktop usr/local/share/applications/liveinst.desktop usr/share/cockpit/branding/vigilos usr/share/vigilos usr/share/grub/themes/vigilos usr/share/sddm/themes/vigilos usr/share/plymouth/themes/vigilos usr/share/plymouth/themes/vigilos-spinner usr/lib/dracut/modules.d/99vigilos-branding etc/anaconda/profile.d/vigilos.conf etc/sddm.conf.d/vigilos.conf usr/local/libexec/vigilos-is-live usr/local/libexec/vigilos-liveuser-setup usr/local/bin/vigilos-first-boot.sh etc/systemd/system/vigilos-first-boot.service etc/systemd/system/sddm-live-autologin.service etc/systemd/system/liveuser-setup.service etc/systemd/system/vigilos-gpu-setup.service usr/local/bin/vigilos-gpu-setup.sh usr/local/bin/vigilos-gpu-notify.sh etc/dracut.conf.d/vigilos-branding.conf)
+PATHS+=(usr/share/glib-2.0/schemas/90-vigilos-dark.gschema.override)
+if [[ ${VIGIL_DESKTOP:-kde} == kde ]]; then
+    PATHS+=(etc/skel/.config/gtk-3.0 etc/skel/.config/gtk-4.0 etc/skel/.config/environment.d/gtk-flatpak.conf etc/skel/.config/plasmarc etc/skel/.config/ksplashrc etc/skel/.config/kwinrc usr/share/themes/VALYRIAN-Total-Steel usr/share/icons/Slot-Beauty-Dark-Icons)
+fi
 if [[ ${VIGIL_DESKTOP:-kde} == i3 ]]; then PATHS+=(etc/lightdm/lightdm.conf.d/50-vigilos.conf etc/systemd/system/vigilos-i3-live.service); fi
 # Own generated fallback artwork while preserving paths belonging to upstream RPMs.
 PATHS+=(usr/share/pixmaps/vigilos-logo.png usr/share/pixmaps/vigilos-start.svg usr/share/pixmaps/vigilos-watermark.png usr/share/pixmaps/vigilos-watermark-128.png)
@@ -101,9 +105,9 @@ cat > "$WORK/SPECS/vigilos-branding.spec" <<'SPEC'
 Name: vigilos-branding
 Version: 1.2
 %if 0%{?vigilos_i3}
-Release: 18%{?dist}
+Release: 20%{?dist}
 %else
-Release: 17%{?dist}
+Release: 19%{?dist}
 %endif
 Summary: VIGIL OS desktop and boot branding assets
 License: GPL-3.0-only AND GPL-2.0-or-later AND LGPL-2.0-or-later AND CC-BY-SA-4.0

@@ -23,7 +23,7 @@ cp "$ROOT/usr/share/licenses/f44-backgrounds-base/CC-BY-SA-4.0" "$WORK/SOURCES/w
 cat >"$WORK/SPECS/vigilos-wallpaper-compat.spec" <<SPEC
 Name: vigilos-wallpaper-compat
 Version: 1.2
-Release: 1%{?dist}
+Release: 2%{?dist}
 Summary: VIGIL OS KDE wallpaper with Fedora44 dependency compatibility
 License: CC-BY-SA-4.0
 BuildArch: noarch
@@ -45,7 +45,9 @@ Original base-art attribution and licenses remain with their upstream package.
 install -Dpm0644 %{SOURCE0} %{buildroot}/usr/share/wallpapers/F44/metadata.json
 install -Dpm0644 %{SOURCE1} %{buildroot}%{_licensedir}/%{name}/CC-BY-SA-4.0
 mkdir -p %{buildroot}/usr/share/wallpapers/F44/contents/images
-ln -s /usr/share/vigilos/wallpapers/VIGILOS/contents/images/1672x941.png %{buildroot}/usr/share/wallpapers/F44/contents/images/1672x941.png
+for image in 1920x1080 2560x1600 3440x1440 3840x2160; do
+    ln -s /usr/share/vigilos/wallpapers/VIGILOS/contents/images/$image.png %{buildroot}/usr/share/wallpapers/F44/contents/images/$image.png
+done
 %files
 %license %{_licensedir}/%{name}/CC-BY-SA-4.0
 /usr/share/wallpapers/F44

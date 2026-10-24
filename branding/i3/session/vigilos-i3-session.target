@@ -1,0 +1,6 @@
+[Unit]
+Description=VIGIL i3 graphical session
+BindsTo=graphical-session.target
+PropagatesStopTo=graphical-session.target
+Wants=graphical-session-pre.target
+After=graphical-session-pre.target graphical-session.target

@@ -2,23 +2,22 @@
 widgetStyle=breeze
 
 [kdeglobals][General]
-ColorScheme=PurPurDayColor
+ColorScheme=VIGILDark
 
 [kdeglobals][Icons]
-Theme=Magna-Glassy-Light-Icons
+Theme=Slot-Beauty-Dark-Icons
 
 [kcminputrc][Mouse]
 cursorTheme=oreo_white_cursors
 
 [kwinrc][org.kde.kdecoration2]
-library=org.kde.kwin.aurorae
-theme=__aurorae__svg__PurPurDayBlur-Aurorae-6
+library=org.kde.breeze
 
 [plasmarc][Theme]
-name=PurPurDay-Plasma
+name=PurPurNight-Plasma
 
 [ksplashrc][KSplash]
-Theme=PurPurDay-Splash-6
+Theme=VIGIL-Dark-Splash
 
 [Wallpaper]
 Image=F44

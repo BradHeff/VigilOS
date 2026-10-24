@@ -1,6 +1,6 @@
 # VIGIL OS 1.2 “Loopback”
 
-VIGIL OS is a Fedora44-based distribution with KDE Plasma Wayland and i3 X11 editions with its own boot, login, desktop and installer identity. This checkout is a development candidate, not a publicly signed production release. Actual build/install evidence and limitations are recorded in [the fresh-build validation record](docs/VALIDATION-2026-10-22.md); historical progress files do not certify the current images.
+VIGIL OS is a Fedora44-based distribution with KDE Plasma Wayland and i3 X11 editions with its own boot, login, desktop and installer identity. This checkout is a development candidate, not a publicly signed production release. Actual build/install evidence and limitations are recorded in [the dark-theme validation record](docs/DARK-THEME-VALIDATION.md); historical progress files do not certify the current images.
 
 ## Included software
 
@@ -20,7 +20,7 @@ SELinux remains Enforcing on live and installed boots. Anaconda temporarily chan
 
 ## Branding
 
-GRUB, Plymouth, SDDM, Plasma splash, wallpaper, welcome and installer use VIGIL OS. Images preserve their aspect ratios; Plymouth uses the upstream Fedora watermark canvas footprint. The city wallpaper source is **1672×941**; larger exports are accurately described as upscaled derivatives. The product wallpaper lives under `/usr/share/vigilos/wallpapers`; a small product RPM provides the native `F44` wallpaper compatibility directory while preserving Plasma dependencies and original base-art attribution. Public artwork is readable by ordinary desktop users. Existing third-party theme authors, licenses and compatibility IDs are retained. Fedora repository names, signing keys, boot-component provenance, licenses and compatibility metadata intentionally retain their upstream identity.
+GRUB, Plymouth, SDDM, Plasma splash, wallpaper, welcome and installer use VIGIL OS. Images preserve their aspect ratios; Plymouth uses the upstream Fedora watermark canvas footprint. The active dark wallpaper variants are user-supplied at 1920×1080, 2560×1600, 3440×1440 and 3840×2160. Their creation/upscale history is unknown; the previous city source remains historical. The product wallpaper lives under `/usr/share/vigilos/wallpapers`; a small product RPM provides the native `F44` wallpaper compatibility directory while preserving Plasma dependencies and original base-art attribution. Public artwork is readable by ordinary desktop users. Existing third-party theme authors, licenses and compatibility IDs are retained. Fedora repository names, signing keys, boot-component provenance, licenses and compatibility metadata intentionally retain their upstream identity.
 
 ## Build and test
 
@@ -32,7 +32,11 @@ bash scripts/build-and-brand.sh
 
 This builds separate KDE and i3 ISOs using verified official Fedora input and a fresh disposable builder for each. Select one with `--desktop kde` or `--desktop i3`; use `--check` for source/prerequisite checks only. Output ISOs, SHA256 files and build-evidence archives are placed in a fresh timestamped directory under `.build/output/`. No existing output is overwritten. Host dependencies are checked, never installed automatically; all package operations and mounts run inside the builder.
 
-See [the complete build guide](docs/BUILD.md) for requirements, workspace/cache options, i3 shortcuts and script organization. The i3 edition uses your portable dotfile theme with Polybar, Rofi, i3lock-color, Greenclip, Alacritty and LightDM; it omits NVIDIA-specific bar modules and personal machine settings. Both editions use the same VIGIL City wallpaper. Original candidate033 evidence remains historical; new clean-build and live-test evidence is recorded separately.
+See [the complete build guide](docs/BUILD.md) for requirements, workspace/cache options, i3 shortcuts and script organization. The i3 edition uses your portable dotfile theme with Polybar, Rofi, i3lock-color, Greenclip, Alacritty and LightDM; it omits NVIDIA-specific bar modules and personal machine settings. Both editions use the supplied dark faded-mark wallpaper, with resolution variants; KDE defaults to the PurPurNight Plasma style and VIGIL Dark palette. Original candidate033 evidence remains historical; new clean-build and live-test evidence is recorded separately.
+
+## SIERRA roadmap
+
+[SIERRA desktop integration](docs/SIERRA-INTEGRATION-PLAN.md) is a future development proposal. No SIERRA services, launchers or automation are implemented by this theme change.
 
 ## Package manager roadmap
 
@@ -48,4 +52,4 @@ See [the complete build guide](docs/BUILD.md) for requirements, workspace/cache 
 
 Upstream legal notices and licenses are retained. See `LICENSE` and individual asset/package notices. No public release, push or signing infrastructure was created by this work.
 
-Current KDE and i3 artifact hashes and actual tests are listed in [the 22 October validation record](docs/VALIDATION-2026-10-22.md). The earlier candidate033 BIOS/UEFI installations and display matrix remain in [the historical record](docs/VALIDATION-2026-10-21.md).
+Current dark KDE and i3 artifact hashes and actual tests are listed in [the dark-theme validation record](docs/DARK-THEME-VALIDATION.md). The [22 October script-cleanup record](docs/VALIDATION-2026-10-22.md) remains historical. The earlier candidate033 BIOS/UEFI installations and display matrix remain in [the historical record](docs/VALIDATION-2026-10-21.md).

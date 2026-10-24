@@ -1,15 +1,15 @@
 {
-    "KPlugin": {
-        "Authors": [
-            {
-                "Email": "contact@vigilglm.ai",
-                "Name": "VIGIL OS Team"
-            }
-        ],
-        "Id": "VIGILOS",
-        "License": "CC-BY-SA-4.0",
-        "Name": "VIGIL OS City",
-        "Description": "VIGIL OS city wallpaper; native 1672×941 source"
-    },
-    "X-KDE-PlasmaImageWallpaper-AccentColor": "#81D4FA"
+  "KPlugin": {
+    "Authors": [
+      {
+        "Email": "contact@vigilglm.ai",
+        "Name": "VIGIL OS Team"
+      }
+    ],
+    "Id": "VIGILOS",
+    "License": "CC-BY-SA-4.0",
+    "Name": "VIGIL OS Dark",
+    "Description": "User-supplied dark faded VIGIL mark, with supplied aspect-ratio variants"
+  },
+  "X-KDE-PlasmaImageWallpaper-AccentColor": "#719bff"
 }

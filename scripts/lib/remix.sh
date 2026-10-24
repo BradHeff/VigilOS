@@ -536,6 +536,14 @@ if [[ -d "$BRANDING_DIR/plymouth/vigilos" ]]; then
     sudo cp "$ROOTFS_DIR/usr/share/plymouth/themes/spinner/spinner.plymouth" "$ROOTFS_DIR/usr/share/plymouth/themes/vigilos-spinner/vigilos-spinner.plymouth"
     sudo sed -i -e 's@ImageDir=.*@ImageDir=/usr/share/plymouth/themes/vigilos-spinner@' -e 's/^Name=.*/Name=VIGIL OS/' "$ROOTFS_DIR/usr/share/plymouth/themes/vigilos-spinner/vigilos-spinner.plymouth"
 
+    sudo python3 - "$ROOTFS_DIR/usr/share/plymouth/themes/vigilos-spinner/vigilos-spinner.plymouth" <<'PLYMOUTH_DARK'
+import configparser,sys
+p=sys.argv[1];c=configparser.ConfigParser(interpolation=None);c.optionxform=str;c.read(p)
+assert c['Plymouth Theme']['ModuleName']=='two-step'
+for key in ['BackgroundStartColor','BackgroundEndColor']:c['two-step'][key]='0x1e1e1e'
+with open(p,'w') as f:c.write(f,space_around_delimiters=False)
+PLYMOUTH_DARK
+
     # Configure Plymouth - use spinner theme with VIGILOS watermark for reliability
     # The vigilos theme uses two-step which may not work on all systems
     sudo mkdir -p "$ROOTFS_DIR/etc/plymouth"
@@ -932,10 +940,10 @@ SessionDir=/usr/share/wayland-sessions
 SDDMEOF
 
 # ============================================
-# PLASMA THEMES AND LOOK-AND-FEEL (PurPurDay)
+# DARK PLASMA THEME AND PRODUCT DEFAULTS
 # ============================================
 echo ""
-echo "=== Applying Plasma Themes (PurPurDay) ==="
+echo "=== Applying VIGIL Dark Plasma Defaults ==="
 
 echo "  - Wallpapers..."
 # Copy VIGILOS wallpaper package (proper Plasma wallpaper structure)
@@ -965,7 +973,7 @@ if [[ -d "$BRANDING_DIR/icons/hicolor" ]]; then
     sudo cp -r "$BRANDING_DIR/icons/hicolor/"* "$ROOTFS_DIR/usr/share/icons/hicolor/"
 fi
 # Vivid-Glassy-Dark-Icons is absent from branding/icons; Magna-Glassy-Light is the default theme
-copy_if_exists "$BRANDING_DIR/icons/Magna-Glassy-Light-Icons" "$ROOTFS_DIR/usr/share/icons/Magna-Glassy-Light-Icons"
+copy_if_exists "$BRANDING_DIR/i3/appearance/icons/Slot-Beauty-Dark-Icons" "$ROOTFS_DIR/usr/share/icons/Slot-Beauty-Dark-Icons"
 
 echo "  - Cursor themes..."
 copy_if_exists "$BRANDING_DIR/cursors/oreo_white_cursors" "$ROOTFS_DIR/usr/share/icons/oreo_white_cursors"
@@ -973,24 +981,23 @@ copy_if_exists "$BRANDING_DIR/cursors/Bibata-Modern-Ice-Regular-Windows" "$ROOTF
 copy_if_exists "$BRANDING_DIR/cursors/Bibata-Modern-Ice-Large-Windows" "$ROOTFS_DIR/usr/share/icons/Bibata-Modern-Ice-Large-Windows"
 copy_if_exists "$BRANDING_DIR/cursors/Bibata-Modern-Ice-Extra-Large-Windows" "$ROOTFS_DIR/usr/share/icons/Bibata-Modern-Ice-Extra-Large-Windows"
 
-echo "  - GTK theme (PurPurDay)..."
-copy_if_exists "$BRANDING_DIR/gtk-themes/PurPurDay-GTK" "$ROOTFS_DIR/usr/share/themes/PurPurDay-GTK"
+echo "  - Shared dark GTK theme..."
+copy_if_exists "$BRANDING_DIR/i3/appearance/themes/VALYRIAN-Total-Steel" "$ROOTFS_DIR/usr/share/themes/VALYRIAN-Total-Steel"
 
-echo "  - Plasma look-and-feel (PurPurDay)..."
-copy_if_exists "$BRANDING_DIR/plasma-themes/PurPurDay-Global-6" "$ROOTFS_DIR/usr/share/plasma/look-and-feel/PurPurDay-Global-6"
-copy_if_exists "$BRANDING_DIR/plasma-themes/PurPurDay-Splash-6" "$ROOTFS_DIR/usr/share/plasma/look-and-feel/PurPurDay-Splash-6"
+echo "  - VIGIL Dark splash..."
+copy_if_exists "$BRANDING_DIR/plasma-themes/VIGIL-Dark-Splash" "$ROOTFS_DIR/usr/share/plasma/look-and-feel/VIGIL-Dark-Splash"
 
-echo "  - Plasma desktop theme (PurPurDay)..."
-copy_if_exists "$BRANDING_DIR/plasma-themes/PurPurDay-Plasma" "$ROOTFS_DIR/usr/share/plasma/desktoptheme/PurPurDay-Plasma"
+echo "  - PurPurNight Plasma style..."
+copy_if_exists "$BRANDING_DIR/plasma-themes/PurPurNight-Plasma" "$ROOTFS_DIR/usr/share/plasma/desktoptheme/PurPurNight-Plasma"
 
 echo "  - Color scheme..."
 # Prefer explicit colour scheme assets
-if [[ -f "$BRANDING_DIR/colourscheme/PurPurDayColor.colors" ]]; then
+if [[ -f "$BRANDING_DIR/colourscheme/VIGILDark.colors" ]]; then
     sudo mkdir -p "$ROOTFS_DIR/usr/share/color-schemes"
-    sudo cp "$BRANDING_DIR/colourscheme/PurPurDayColor.colors" "$ROOTFS_DIR/usr/share/color-schemes/PurPurDayColor.colors"
+    sudo cp "$BRANDING_DIR/colourscheme/VIGILDark.colors" "$ROOTFS_DIR/usr/share/color-schemes/VIGILDark.colors"
 elif [[ -f "$BRANDING_DIR/plasma-themes/PurPurDay-Plasma/colors" ]]; then
     sudo mkdir -p "$ROOTFS_DIR/usr/share/color-schemes"
-    sudo cp "$BRANDING_DIR/plasma-themes/PurPurDay-Plasma/colors" "$ROOTFS_DIR/usr/share/color-schemes/PurPurDayColor.colors"
+    sudo cp "$BRANDING_DIR/plasma-themes/PurPurDay-Plasma/colors" "$ROOTFS_DIR/usr/share/color-schemes/VIGILDark.colors"
 fi
 
 echo "  - Konsole color scheme..."
@@ -999,8 +1006,16 @@ if [[ -f "$BRANDING_DIR/colourscheme/PurPurDayBlur-Konsole.colorscheme" ]]; then
     sudo cp "$BRANDING_DIR/colourscheme/PurPurDayBlur-Konsole.colorscheme" "$ROOTFS_DIR/usr/share/konsole/PurPurDayBlur-Konsole.colorscheme"
 fi
 
-echo "  - Aurorae window decoration (PurPurDay)..."
-copy_if_exists "$BRANDING_DIR/aurorae/PurPurDayBlur-Aurorae-6" "$ROOTFS_DIR/usr/share/aurorae/themes/PurPurDayBlur-Aurorae-6"
+echo "  - Native Breeze decoration follows the dark palette..."
+
+
+sudo mkdir -p "$ROOTFS_DIR/usr/share/glib-2.0/schemas"
+sudo tee "$ROOTFS_DIR/usr/share/glib-2.0/schemas/90-vigilos-dark.gschema.override" >/dev/null <<'GSETTINGS_DARK'
+[org.gnome.desktop.interface]
+color-scheme='prefer-dark'
+gtk-theme='VALYRIAN-Total-Steel'
+icon-theme='Slot-Beauty-Dark-Icons'
+GSETTINGS_DARK
 
 # ============================================
 # PRODUCT APPLICATION MENU ICONS
@@ -1045,10 +1060,10 @@ if [[ -f "$BRANDING_DIR/logos/vigilos-logo.png" ]]; then
 fi
 
 # ============================================
-# USER SKELETON (PurPurDay THEME CONFIG)
+# USER SKELETON (VIGIL DARK DEFAULTS)
 # ============================================
 echo ""
-echo "=== Applying User Skeleton Config (PurPurDay Theme) ==="
+echo "=== Applying User Skeleton Config (VIGIL Dark) ==="
 
 # Create skel with PurPurDay theme elements (NOT Global theme - avoids layout issues)
 # This applies: Plasma style, icons, cursors, colors, window decoration, splash
@@ -1069,12 +1084,12 @@ if [[ -d "$SKEL_DIR" ]]; then
 fi
 
 # Create Plasma theme configs (individual elements, not Global theme)
-echo "  - Creating PurPurDay Plasma configs..."
+echo "  - Creating VIGIL Dark Plasma configs..."
 
 # plasmarc - Plasma desktop theme
 sudo tee "$ROOTFS_DIR/etc/skel/.config/plasmarc" > /dev/null << 'PLASMARC'
 [Theme]
-name=PurPurDay-Plasma
+name=PurPurNight-Plasma
 PLASMARC
 
 # kdeglobals - Icon theme and widget style (NO LookAndFeelPackage!)
@@ -1083,12 +1098,14 @@ sudo tee "$ROOTFS_DIR/etc/skel/.config/kdeglobals" > /dev/null << 'KDEGLOBALS'
 widgetStyle=breeze
 
 [Icons]
-Theme=Magna-Glassy-Light-Icons
+Theme=Slot-Beauty-Dark-Icons
 
 [General]
-ColorScheme=PurPurDayColor
+ColorScheme=VIGILDark
 BrowserApplication=brave-browser.desktop
 KDEGLOBALS
+
+sudo install -Dm0644 "$SKEL_DIR/.config/kdeglobals" "$ROOTFS_DIR/etc/skel/.config/kdeglobals"
 
 sudo install -Dm0644 "$SKEL_DIR/.config/mimeapps.list" "$ROOTFS_DIR/etc/skel/.config/mimeapps.list"
 sudo install -Dm0644 "$SKEL_DIR/.config/kcm-about-distrorc" "$ROOTFS_DIR/etc/skel/.config/kcm-about-distrorc"
@@ -1103,8 +1120,7 @@ KCMINPUT
 # kwinrc - Window decoration (Aurorae)
 sudo tee "$ROOTFS_DIR/etc/skel/.config/kwinrc" > /dev/null << 'KWINRC'
 [org.kde.kdecoration2]
-library=org.kde.kwin.aurorae
-theme=__aurorae__svg__PurPurDayBlur-Aurorae-6
+library=org.kde.breeze
 
 [Desktops]
 Number=1
@@ -1120,7 +1136,7 @@ KWINRC
 # ksplashrc - Splash screen
 sudo tee "$ROOTFS_DIR/etc/skel/.config/ksplashrc" > /dev/null << 'KSPLASH'
 [KSplash]
-Theme=PurPurDay-Splash-6
+Theme=VIGIL-Dark-Splash
 Engine=KSplashQML
 KSPLASH
 
@@ -1141,7 +1157,7 @@ wallpaperplugin=org.kde.image
 
 [Containments][1][Wallpaper][org.kde.image][General]
 Image=/usr/share/wallpapers/F44/
-PreviewImage=/usr/share/vigilos/wallpapers/VIGILOS/contents/images/1672x941.png
+PreviewImage=/usr/share/vigilos/wallpapers/VIGILOS/contents/images/3840x2160.png
 SlidePaths=/usr/share/wallpapers/
 PLASMADESKTOP
 
@@ -1156,7 +1172,7 @@ sudo install -m0644 "$SKEL_DIR/.config/kscreenlockerrc" "$ROOTFS_DIR/etc/skel/.c
 
 # Copy configs to liveuser
 if [[ -d "$ROOTFS_DIR/home/liveuser" ]]; then
-    echo "  - Setting up liveuser with PurPurDay theme..."
+    echo "  - Setting up liveuser with VIGIL Dark theme..."
     sudo mkdir -p "$ROOTFS_DIR/home/liveuser/.config"
     sudo cp "$ROOTFS_DIR/etc/skel/.config/plasmarc" "$ROOTFS_DIR/home/liveuser/.config/"
     sudo cp "$ROOTFS_DIR/etc/skel/.config/kdeglobals" "$ROOTFS_DIR/home/liveuser/.config/"

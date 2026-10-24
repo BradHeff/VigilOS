@@ -4,8 +4,8 @@
 title-text: ""
 desktop-image: "background.png"
 # Preserve the decorative grid geometry on4:3,16:10 and16:9 screens.
-desktop-image-scale-method: "crop"
-desktop-color: "#0d1117"
+desktop-image-scale-method: "padding"
+desktop-color: "#1e1e1e"
 terminal-font: "dejavu_sans_16 Regular 16"
 terminal-box: "terminal_box_*.png"
 terminal-left: "0"
@@ -40,7 +40,7 @@ terminal-border: "0"
     width = 86%
     height = 45%
     item_font = "dejavu_sans_16 Regular 16"
-    item_color = "#8b949e"
+    item_color = "#c3c8d2"
     selected_item_font = "dejavu_sans_bold_16 Bold 16"
     selected_item_color = "#ffffff"
     selected_item_pixmap_style = "select_*.png"

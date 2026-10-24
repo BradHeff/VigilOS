@@ -6,7 +6,6 @@ License=GPLv3
 Type=sddm-theme
 Version=1.2
 Website=
-Screenshot=preview.png
 MainScript=Main.qml
 ConfigFile=theme.conf
 TranslationsDirectory=translations
