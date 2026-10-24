@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Replace only the Fedora KDE artwork wrapper; keep native desktop dependencies.
+
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$REPO_DIR/scripts/lib/require-builder.sh"

@@ -1,12 +1,5 @@
-# VIGILOS — enforce LF on everything that runs or is parsed on Linux.
-# CRLF in a shell script makes the shebang `#!/bin/bash\r`, which the Linux
-# kernel rejects with "exec format error". This file prevents that regressing
-# regardless of the OS the repo is edited on.
-
-# Default: treat as text, normalize to LF in the repo.
 * text=auto eol=lf
 
-# Explicit LF for executable / parsed text.
 *.sh        text eol=lf
 *.ks        text eol=lf
 *.bash      text eol=lf
@@ -29,7 +22,6 @@ hfetch      text eol=lf
 .bashrc     text eol=lf
 .bash_aliases text eol=lf
 
-# Binary assets — never touch line endings.
 *.png       binary
 *.jpg       binary
 *.jpeg      binary

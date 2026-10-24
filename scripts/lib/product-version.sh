@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Read-only fields; callers enforce the disposable-builder guard before changes.
+
 _VIGIL_FIELDS="$(python3 "$(dirname "${BASH_SOURCE[0]}")/version.py" --fields)" || return 1
 mapfile -t _VIGIL_RELEASE <<< "$_VIGIL_FIELDS"
 VIGIL_VERSION="${_VIGIL_RELEASE[0]}"

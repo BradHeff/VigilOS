@@ -1,71 +1,36 @@
-<p align="center">
-  <img src="branding/logos/vigilos-logo.png" alt="VpM Logo" width="120"/>
-</p>
-
-<h1 align="center">VpM — VIGILOS Package Manager</h1>
-
-<p align="center">
-  <strong>A Modern, Fast, and Flexible Package Manager for VIGILOS</strong>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/status-Design%20Proposal-orange?style=for-the-badge" alt="Status"/>
-  <img src="https://img.shields.io/badge/language-Rust-B7410E?style=for-the-badge" alt="Language"/>
-  <img src="https://img.shields.io/badge/license-GPL--3.0-green?style=for-the-badge" alt="License"/>
-</p>
-
-<p align="center">
-  <a href="#overview">Overview</a> •
-  <a href="#features">Features</a> •
-  <a href="#architecture">Architecture</a> •
-  <a href="#package-format">Package Format</a> •
-  <a href="#usage">Usage</a> •
-  <a href="#building-packages">Building Packages</a> •
-  <a href="#repository">Repository</a>
-</p>
-
----
+# VpM
 
 ## Overview
 
-> **Evidence status:** This checkout contains this design document and no Rust source or Cargo manifests. All VpM features, command examples, architecture and repository endpoints below are proposals, not verified capabilities. The separately linked public GitHub URL returned HTTP 404 during this review; no private access was attempted. The ISO continues to use Fedora RPM/DNF5 for supported system updates.
+VpM is a proposed package manager for VIGIL OS. This checkout has no Rust implementation or Cargo manifest. Features, commands and repository addresses below are design examples. The ISO uses RPM and DNF5 for system updates.
 
+The design uses a native .vpm package format, a Rust implementation and a package repository called ViR. Package ownership and safe coexistence with RPM must be resolved before system transactions are implemented.
 
-**VpM (VIGILOS Package Manager)** is a next-generation package manager designed specifically for VIGILOS. Inspired by the simplicity of Arch Linux's `pacman` and the community-driven AUR, VpM combines ease of use with powerful features.
-
-### Design Philosophy
-
-- **Simplicity** — Intuitive commands that feel natural
-- **Speed** — Built in Rust for blazing-fast performance
-- **Flexibility** — Native `.vpm` packages with RPM compatibility
-- **Community** — User-contributed packages via ViR (VIGILOS Package Repository)
-- **Transparency** — Clear, readable build scripts
-
----
+The initial prototype should inspect and build packages, then plan transactions without changing the system. Installation and recovery need testing in disposable roots before use on a live system.
 
 ## Features
 
-### Core Features
+### Proposed features
 
 | Feature | Description |
 |---------|-------------|
-| **Native `.vpm` Format** | Lightweight, efficient package format designed for VIGILOS |
-| **RPM Compatibility** | Seamless installation of Fedora/RHEL `.rpm` packages |
-| **Parallel Downloads** | Multi-threaded package downloads for faster operations |
-| **Dependency Resolution** | Automatic handling of package dependencies |
-| **Transaction Safety** | Atomic operations with rollback support |
-| **Delta Updates** | Download only changed portions of packages |
+| Native `.vpm` Format | Proposed archive format for VIGIL OS |
+| RPM Compatibility | Proposed RPM support, subject to an ownership design |
+| Parallel Downloads | Multi-threaded package downloads for faster operations |
+| Dependency Resolution | Automatic handling of package dependencies |
+| Transaction Safety | Planned recovery, requiring filesystem and scriptlet design |
+| Delta Updates | Download only changed portions of packages |
 
-### Repository System
+### Repository design
 
 | Repository | Description |
 |------------|-------------|
-| **core** | Essential system packages maintained by VIGILOS team |
-| **extra** | Additional software maintained by VIGILOS team |
-| **community** | User-contributed packages from ViR |
-| **fedora** | Compatibility layer for Fedora RPM repositories |
+| core | Essential system packages maintained by VIGILOS team |
+| extra | Additional software maintained by VIGILOS team |
+| community | User-contributed packages from ViR |
+| fedora | Compatibility layer for Fedora RPM repositories |
 
-### Package Sources
+### Package sources
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -92,11 +57,9 @@
 └─────────────────────────────────────────────────────────┘
 ```
 
----
-
 ## Architecture
 
-### Component Overview
+### Components
 
 ```
 vpm/
@@ -135,7 +98,7 @@ vpm/
     └── Cargo.toml
 ```
 
-### Database Structure
+### Database design
 
 The proposal considers SQLite for native VpM package metadata. SQLite transaction atomicity alone does not provide filesystem, package-scriptlet, bootloader or whole-OS rollback. Database design and crash recovery remain unimplemented:
 
@@ -153,11 +116,9 @@ The proposal considers SQLite for native VpM package metadata. SQLite transactio
 └── logs/                # Transaction logs
 ```
 
----
+## Package format
 
-## Package Format
-
-### `.vpm` Package Structure
+### Archive structure
 
 An `.vpm` package is a compressed archive containing:
 
@@ -174,7 +135,7 @@ package-1.0.0-1.vpm
     └── etc/
 ```
 
-### Package Metadata (.PKGINFO)
+### Package metadata (.PKGINFO)
 
 ```toml
 [package]
@@ -203,19 +164,17 @@ backup = ["/etc/example/config.toml"]
 
 ### Compression
 
-VpM packages use **zstd** compression for optimal balance of speed and size:
+The proposed default archive compression is zstd:
 
 | Compression | Speed | Size | VpM Default |
 |-------------|-------|------|-------------|
 | gzip        | Fast  | Large | No |
 | xz          | Slow  | Small | No |
-| **zstd**    | Fast  | Small | **Yes** |
-
----
+| zstd    | Fast  | Small | Yes |
 
 ## Usage
 
-### Basic Commands
+### Basic commands
 
 ```bash
 # Synchronize package databases
@@ -252,7 +211,7 @@ vpm list --explicit
 vpm clean
 ```
 
-### Advanced Usage
+### Advanced usage
 
 ```bash
 # Install without dependencies (not recommended)
@@ -280,7 +239,7 @@ vpm list --repo core
 vpm check-updates
 ```
 
-### Repository Management
+### Repository management
 
 ```bash
 # List configured repositories
@@ -299,11 +258,9 @@ vpm repo disable fedora
 vpm repo enable fedora
 ```
 
----
+## Building packages
 
-## Building Packages
-
-### VPMBUILD File
+### VPMBUILD file
 
 The `VPMBUILD` file is a shell script that defines how to build a package:
 
@@ -349,7 +306,7 @@ package() {
 }
 ```
 
-### Building a Package
+### Building a package
 
 ```bash
 # Navigate to directory with VPMBUILD
@@ -368,7 +325,7 @@ vpm-build --arch x86_64
 vpm-build --clean
 ```
 
-### Package Validation
+### Package validation
 
 ```bash
 # Validate package before publishing
@@ -381,19 +338,17 @@ vpm-lint VPMBUILD
 vpm-build --test
 ```
 
----
-
 ## Repository
 
-### ViR — VIGILOS Package Repository
+### ViR repository
 
-ViR is the community-driven package repository for VIGILOS, similar to the AUR for Arch Linux.
+ViR is the proposed community package repository. The account, submission and installation examples below describe a future interface.
 
-#### Submitting Packages
+#### Submitting packages
 
-1. **Create an ViR account** at [vir.vigilglm.ai](https://vir.vigilglm.ai)
+1. Create an ViR account at [vir.vigilglm.ai](https://vir.vigilglm.ai)
 
-2. **Prepare your package:**
+2. Prepare your package:
    ```bash
    # Create package directory
    mkdir mypackage && cd mypackage
@@ -405,7 +360,7 @@ ViR is the community-driven package repository for VIGILOS, similar to the AUR f
    vpm-build --geninfo
    ```
 
-3. **Submit to ViR:**
+3. Submit to ViR:
    ```bash
    # Initialize ViR repository
    git init
@@ -433,7 +388,7 @@ apr install package-name
 apr upgrade
 ```
 
-### Repository Configuration
+### Repository configuration
 
 Repository configuration is stored in `/etc/vpm/repos.d/`:
 
@@ -453,11 +408,9 @@ Enabled = true
 # Native catalog signature settings do not configure Fedora repository metadata.
 ```
 
----
+## RPM compatibility
 
-## RPM Compatibility
-
-### How It Works
+### Compatibility flow
 
 The following compatibility diagram is an unimplemented proposal, not a safe coexistence design. Extracting RPM payloads, running scriptlets, and recording only SQLite state would bypass RPM ownership and cannot safely coexist with DNF/rpmdb:
 
@@ -482,7 +435,7 @@ The following compatibility diagram is an unimplemented proposal, not a safe coe
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Installing RPM Packages
+### Installing RPM packages
 
 ```bash
 # Install RPM from file
@@ -502,8 +455,8 @@ vpm search --repo fedora keyword
 
 No ownership architecture has been selected or implemented. Evaluate explicitly:
 
-1. **Supported Fedora system with isolated native packages:** rpmdb remains authoritative for RPM-owned system files and RPM/DNF5 performs their transactions. Early `.vpm` packages install into a separate prefix, with collision detection and no writes over RPM-owned files. Native metadata can use SQLite without claiming ownership of the Fedora system.
-2. **Future VpM sole ownership of the complete root:** requires an explicit migration, replacement of RPM/DNF system management, compatible dependencies/scriptlets/triggers, complete ownership accounting, crash recovery, upgrade and rollback design, security maintenance and repository infrastructure. This is a separate distribution architecture decision.
+1. Supported Fedora system with isolated native packages: rpmdb remains authoritative for RPM-owned system files and RPM/DNF5 performs their transactions. Early `.vpm` packages install into a separate prefix, with collision detection and no writes over RPM-owned files. Native metadata can use SQLite without claiming ownership of the Fedora system.
+2. Future VpM sole ownership of the complete root: requires an explicit migration, replacement of RPM/DNF system management, compatible dependencies/scriptlets/triggers, complete ownership accounting, crash recovery, upgrade and rollback design, security maintenance and repository infrastructure. This is a separate distribution architecture decision.
 
 The ISO first release keeps Fedora updates supported. Do not silently implement either option as a solver/database replacement or treat a branded DNF frontend as completion of the native `.vpm` ambition.
 
@@ -522,11 +475,9 @@ AI-generated package descriptions, recipes, patches and commands are untrusted i
 - Decide the system ownership architecture before any mixed live-system transaction support.
 - Report measured test results; do not advertise production readiness from design tables.
 
----
-
 ## Configuration
 
-### Main Configuration
+### Main configuration
 
 `/etc/vpm/vpm.conf`:
 
@@ -565,7 +516,7 @@ SigLevel = Required DatabaseRequired
 Color = auto
 ```
 
-### Mirror Configuration
+### Mirror configuration
 
 `/etc/vpm/mirrorlist`:
 
@@ -581,25 +532,7 @@ Server = https://us.mirror.vigilglm.ai/$repo/$arch
 Server = https://eu.mirror.vigilglm.ai/$repo/$arch
 ```
 
----
-
-## Comparison
-
-### Proposed VpM targets (not verified capabilities)
-
-| Feature | VpM | pacman | DNF | apt |
-|---------|-----|--------|-----|-----|
-| Native Format | `.vpm` | `.pkg.tar.zst` | `.rpm` | `.deb` |
-| RPM Support | Planned | ❌ | ✅ | ❌ |
-| DEB Support | Not planned | ❌ | ❌ | ✅ |
-| Parallel Downloads | Planned | ✅ | ✅ | ❌ |
-| Delta Updates | Planned | ❌ | ✅ | ❌ |
-| AUR-like Repo | Planned ViR | ✅ AUR | ❌ COPR | ❌ PPA |
-| Written In | Rust | C | Python | C++ |
-| Transaction Safety | Planned | ✅ | ✅ | ✅ |
----
-
-## Development Status
+## Development status
 
 ### Current phase: design proposal; implementation unverified
 
@@ -607,7 +540,7 @@ Server = https://eu.mirror.vigilglm.ai/$repo/$arch
 |-----------|---------------------------|
 | Native format, library, CLI, solver, repository and build system | Planned; no implementation present |
 | Documentation | Design proposal; not proof of working transactions |
-| External VpM repository | Public URL returned HTTP 404; private implementation, if any, remains unverified |
+| External VpM repository | Not verified; this document does not establish availability |
 
 ### Roadmap
 
@@ -633,13 +566,11 @@ Server = https://eu.mirror.vigilglm.ai/$repo/$arch
 - [ ] Package building
 - [ ] ViR integration
 
----
-
 ## Contributing
 
-We welcome contributions to VpM! See the main [VIGILOS README](README.md#contributing) for general contribution guidelines.
+Implementation work requires a separate scope and licence decision. These commands describe a possible development setup; no working VpM repository or bootstrap process is established by this document.
 
-### Development Setup
+### Development setup
 
 ```bash
 # Clone the repository
@@ -659,25 +590,13 @@ cargo test
 RUST_LOG=debug cargo run -- install example
 ```
 
-### Code Style
+### Code style
 
 - Follow Rust standard formatting (`cargo fmt`)
 - Use `clippy` for linting (`cargo clippy`)
 - Write tests for new features
 - Document public APIs
 
----
-
 ## License
 
-VpM is distributed under the **GNU General Public License v3.0**.
-
----
-
-<p align="center">
-  <strong>VpM</strong> — Simple. Fast. Flexible.
-</p>
-
-<p align="center">
-  Part of the <a href="README.md">VIGILOS</a> project
-</p>
+No VpM implementation is distributed in this checkout. A future implementation needs an explicit licence decision. See [LICENSE](LICENSE) for this repository and its preserved upstream and prior GPL rights.

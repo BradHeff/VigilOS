@@ -7,8 +7,8 @@ for rel in ['boot/grub2/grub.cfg','EFI/BOOT/grub.cfg']:
  if not p.exists():continue
  s=p.read_text()
  s=s.replace('set default="1"','set default="0"').replace('set timeout=10','set timeout=5')
- # Fedora 44 media define functions inside an if statement; GRUB's parser
- # rejects those declarations (also reproduced by grub2-script-check on base).
+
+
  pattern=r'if \[ "\$grub_platform" == "efi" \]; then\n\tfunction load_video \{.*?\nfi\n\nload_video'
  replacement='if [ "$grub_platform" == "efi" ]; then\n  insmod efi_gop\n  insmod efi_uga\n  insmod video_bochs\n  insmod video_cirrus\n  set basicgfx="nomodeset"\nelse\n  set basicgfx="nomodeset vga=791"\nfi\ninsmod all_video'
  s=re.sub(pattern,replacement,s,count=1,flags=re.S)

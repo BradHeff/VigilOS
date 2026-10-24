@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fork the installed Fedora common metadata, retaining its MIT notices/presets/macros.
+
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$REPO_DIR/scripts/lib/require-builder.sh"

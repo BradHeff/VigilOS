@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Bind Fedora repository locations to the base release, independent of product ID.
-
-Use libdnf5's distribution overrides, shared by DNF and PackageKit. Original
-Fedora-owned repo files, enabled states and security settings remain untouched.
-"""
+"""Bind Fedora repository locations to the verified base release."""
 import configparser
 import io
 import os
@@ -17,6 +13,7 @@ LOCATION_OPTIONS = {'name', 'baseurl', 'metalink', 'mirrorlist', 'gpgkey'}
 
 
 def repository_overrides(sources, base_release='44'):
+    """Bind Fedora URL and key variables without changing trust settings."""
     if base_release != '44':
         raise ValueError('This product requires the verified Fedora 44 base')
     result = configparser.ConfigParser(interpolation=None)

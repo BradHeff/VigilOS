@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pack only an owned prepared root; assembly can use bounded artifact transfer.
+
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$REPO_DIR/scripts/lib/require-builder.sh"
@@ -18,8 +18,7 @@ cleanup() {
 }
 trap cleanup EXIT
 mkdir -p "$WORK/erofs" "$(dirname "$IMAGE")"
-# Validate against the target policy, not the cloud builder's smaller policy.
-# Encode labels directly in EROFS: no active SELinux policy change is required.
+
 setfiles -n -c "$POLICY" -F -r "$ROOT" "$CONTEXTS" "$ROOT/etc/passwd" "$ROOT/etc/shadow" "$ROOT/usr/bin/$(test -e "$ROOT/usr/bin/lightdm" && echo lightdm || echo sddm)"
 EROFS_LEVEL="${VIGIL_EROFS_LEVEL:-6}"
 [[ "$EROFS_LEVEL" =~ ^[1-9]$ ]] || { echo 'EROFS compression level must be1–9' >&2; exit 1; }

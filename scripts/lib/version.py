@@ -34,6 +34,7 @@ def read_json(path):
 
 
 def load_config(path):
+    """Validate the persistent manual release settings and next counter."""
     data = read_json(path)
     if not isinstance(data, dict) or set(data) != {'build_number', 'codename', 'next_version_number'}:
         raise ValueError('version.json requires build_number, codename and next_version_number')
@@ -90,6 +91,7 @@ def preview_release(config, build_id='preview'):
 
 
 def load_release(path):
+    """Validate a frozen per-run product release."""
     data = read_json(path)
     if not isinstance(data, dict) or set(data) != {'build_number', 'version_number', 'codename', 'build_id', 'version'}:
         raise ValueError('Invalid frozen release metadata')
@@ -105,6 +107,7 @@ def source_release(root=ROOT):
 
 
 def atomic_json(path, data, expected=None):
+    """Commit JSON atomically without overwriting a concurrent edit."""
     path = Path(path)
     mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o644
     fd, name = tempfile.mkstemp(prefix=f'.{path.name}.', suffix='.tmp', dir=path.parent)
@@ -147,6 +150,7 @@ class BuildLock:
 
 
 def reserve_release(root, run_dir, build_id, lock):
+    """Consume one version under the checkout lock and freeze run metadata."""
     root, run_dir = Path(root).resolve(), Path(run_dir).resolve()
     if lock.root != root or lock.fd is None:
         raise RuntimeError('Checkout build lock required before version reservation')
@@ -157,7 +161,7 @@ def reserve_release(root, run_dir, build_id, lock):
     if any((run_dir / n).exists() for n in ('release.json', 'version.json')):
         raise RuntimeError('Fresh release snapshot paths required')
     data['next_version_number'] += 1
-    # Reserve first: a failed/partial build must never reuse an artifact version.
+
     atomic_json(config, data, expected=before)
     for name, payload in [('release.json', release.record()), ('version.json', data)]:
         with (run_dir / name).open('x') as stream:

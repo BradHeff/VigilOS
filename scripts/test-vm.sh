@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 umask 077
-# Run only after explicit VM approval. No host devices, shares or credentials.
+
 [[ "${VIGIL_EXECUTION_APPROVED:-0}" == 1 ]] || { echo 'ERROR: Execution approval is required.' >&2; exit 1; }
 MODE="${1:-}"
 NAME="${2:-}"
@@ -17,7 +17,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LAB_ROOT="$(realpath -m "${VIGIL_TEST_ROOT:-$REPO_DIR/.build/test}")"
 VM_ROOT="$LAB_ROOT/vm"
 mkdir -p "$VM_ROOT"
-# Only one VM is active: max 6 GiB RAM, max aggregate disk capacity 192 GiB.
+
 exec 9>"$VM_ROOT/active.lock"
 flock -n 9 || { echo 'ERROR: Another lab VM is active.' >&2; exit 1; }
 DISK="$VM_ROOT/$NAME.qcow2"
@@ -38,7 +38,7 @@ if [[ ! -e "$DISK" ]]; then
 fi
 [[ -f "$DISK" && ! -L "$DISK" && -f "$VARS" && ! -L "$VARS" && -f "$OWNERSHIP" ]] || { echo 'ERROR: VM state must consist of owned regular files.' >&2; exit 1; }
 [[ "$(cat "$OWNERSHIP")" == "$NAME:$DISK_GIB:$LAB_ROOT" ]] || { echo 'ERROR: VM ownership mismatch.' >&2; exit 1; }
-#4GiB is the explicit low-memory stress configuration; normal comparison uses6GiB.
+
 RAM="${VIGIL_RAM_MIB:-$RAM}"
 [[ "$RAM" == 4096 || "$RAM" == 6144 ]] || { echo 'ERROR: Lab RAM must be4GiB or6GiB.' >&2; exit 1; }
 DISPLAY_MODE="${VIGIL_DISPLAY_MODE:-1280x800}"

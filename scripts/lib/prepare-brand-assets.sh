@@ -11,7 +11,7 @@ SVG_DIR="$DEST/logos/source"
 MAGICK="$(command -v magick || command -v convert)"
 render() {
     local svg="$1" bounds="$2" out="$3"
-    # Render vector geometry above the target resolution, then fit with transparent padding.
+
     "$MAGICK" -background none -density 1200 "$svg" -resize "$bounds" -gravity center -extent "$bounds" "PNG32:$out"
 }
 render "$SVG_DIR/vigil-mark.svg" 980x980 "$DEST/logos/vigilos-logo.png"
@@ -23,8 +23,6 @@ for size in 16 24 32 48 64 128 256 512; do
 done
 render "$SVG_DIR/vigil-mark.svg" 112x112 "$DEST/grub/vigilos/logo.png"
 
-# GRUB's PNG decoder requires8-bit channels. Preserve alpha rather than
-# flattening to an opaque black rectangle; source artwork remains untouched.
 for png in "$DEST/grub/vigilos/"*.png; do
     [[ -f "$png" ]] || continue
     "$MAGICK" "$png" -depth 8 "PNG32:$png.vigil-rgba.png"

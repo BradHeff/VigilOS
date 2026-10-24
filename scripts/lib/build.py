@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""One command: verified Fedora inputs -> fresh isolated builder -> verified ISOs.
-
-No host package installation, root commands, host shares, user SSH keys, or
-changes to host configuration. Each edition uses its own fresh cloud overlay.
-Only the QEMU processes started by this invocation are ever stopped.
-"""
+"""Build VIGIL OS ISOs in disposable guests from verified Fedora inputs."""
 from __future__ import annotations
 import argparse, datetime, fcntl, hashlib, json, os, re, shlex, shutil
 import socket, subprocess, sys, threading, time, urllib.request
@@ -41,6 +36,7 @@ def download(url, target):
     partial.replace(target)
 
 def verify_inputs(cache, work):
+    """Verify pinned Fedora downloads against signed checksums."""
     cache.mkdir(parents=True,exist_ok=True)
     download('https://fedoraproject.org/fedora.gpg',cache/'fedora.gpg')
     keyhome=work/'keyring'; keyhome.mkdir(mode=0o700)
@@ -73,6 +69,7 @@ def ssh_args(work, port):
             '-o','ServerAliveInterval=15','-o','ServerAliveCountMax=8','builder@127.0.0.1']
 
 def cloud_seed(work, public_key):
+    """Create cloud-init media with a temporary builder key."""
     setup=(REPO/'scripts/lib/guest-setup.sh').read_text()
     userdata='''#cloud-config
 users:
@@ -98,13 +95,14 @@ runcmd:
     run(['xorriso','-as','mkisofs','-quiet','-R','-J','-V','cidata','-o',work/'seed.iso',work/'user-data',work/'meta-data'])
 
 def copy_source(work, release_dir):
-    # Explicit source roots exclude Git/private history, builds, images and keys.
-    roots=['scripts','branding','Skel','PLASMA-CONFIGS','kickstarts','LICENSE']
+    """Create read-only source media with frozen release metadata."""
+    roots=['scripts','branding','Skel','PLASMA-CONFIGS','kickstarts','LICENSE','LICENSES']
     run(['xorriso','-as','mkisofs','-quiet','-R','-J','-V','VIGIL_SOURCE',
          '-m','__pycache__','-m','*.pyc','-o',work/'source.iso','-graft-points',*[f'{name}={REPO/name}' for name in roots],
          f'version.json={release_dir / "version.json"}', f'release.json={release_dir / "release.json"}'],cwd=REPO)
 
 def stream_build(command, work, qemu, timeout):
+    """Record guest output and enforce build timeouts."""
     process=subprocess.Popen(command,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1)
     last_output=[time.monotonic()]
     def consume():
@@ -125,6 +123,7 @@ def stream_build(command, work, qemu, timeout):
     if process.returncode: raise RuntimeError(f'Build failed ({process.returncode}); see {work / "build.log"}')
 
 def build_edition(desktop, inputs, args, parent):
+    """Build and retrieve one edition in an owned disposable VM."""
     work=parent/desktop; work.mkdir(mode=0o700)
     copy_source(work, parent)
     run(['ssh-keygen','-q','-t','ed25519','-N','','-f',work/'builder-key'])
@@ -213,11 +212,12 @@ def main():
     if args.check:
         log(f'Host prerequisites and source checks passed; next release {upcoming.version} ({upcoming.codename}); version counter unchanged')
         return
-    # This checkout-wide lock also covers different --workspace directories.
+
     with BuildLock(REPO) as release_lock:
         build_run(args, release_lock)
 
 def build_run(args, release_lock):
+    """Lock the workspace before allocating run state."""
     args.workspace.mkdir(parents=True,exist_ok=True)
     with (args.workspace/'build.lock').open('a') as lock:
         try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -225,6 +225,7 @@ def build_run(args, release_lock):
         build_locked_workspace(args, release_lock)
 
 def build_locked_workspace(args, release_lock):
+    """Reserve one version and finish every requested edition."""
     stamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     parent=args.workspace/f'run-{stamp}';parent.mkdir(mode=0o700)
     args.output=args.output or args.workspace/'output'/stamp

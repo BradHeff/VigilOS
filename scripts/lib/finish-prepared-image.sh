@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Finish only an owned, prepared Fedora KDE EROFS image inside the disposable VM.
+
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$REPO_DIR/scripts/lib/require-builder.sh"

@@ -1,57 +1,63 @@
 # VIGIL OS
 
-VIGIL OS is a Fedora44-based distribution with KDE Plasma Wayland and i3 X11 editions with its own boot, login, desktop and installer identity. This checkout is a development candidate, not a publicly signed production release. The build script now allocates a persistent product version for each real build; see [version numbering](docs/BUILD.md#version-numbering). The three manual-build update/theme defects are repaired in the maintained source. The earlier version 1.2 KDE and i3 rebuilds passed the VM checks in [the repaired-build report](docs/REPAIRED-BUILD-VALIDATION-2026-10-24.md), including fresh UEFI installation, updates, authentication and display checks. The original manual images and their failure record are preserved. Hardware and Secure Boot remain untested.
+VIGIL OS is a Fedora 44 based Linux distribution created by Brad Heffernan. It has two editions: KDE Plasma on Wayland and i3 on X11. Both use the same dark wallpaper and VIGIL branding across the boot screen, login, desktop and installer.
 
-## Included software
+The KDE edition includes SDDM, Dolphin, Konsole, Kate and Discover. The i3 edition includes LightDM, Polybar, Rofi, i3lock-color, Greenclip, Alacritty and Thunar. Both include Brave as the default browser, LibreOffice, Node.js, npm, Python and Flatpak. System updates use RPM and DNF5 with signed Fedora and Brave repositories.
 
-| Purpose | Software |
+This is a development project. Earlier 1.2 images passed BIOS and UEFI live boot, fresh UEFI installation, installed login and reboot, updates, lock authentication and display checks in virtual machines. Physical hardware and Secure Boot have not been qualified. Later source checks do not replace testing a newly built ISO.
+
+## Screenshots
+
+### KDE Plasma
+
+![VIGIL OS KDE Plasma desktop](images/KDE-Desktop.png)
+
+| Application menu | Live environment |
 | --- | --- |
-| KDE desktop | Plasma Wayland, SDDM, Dolphin, Konsole, Kate, Discover |
-| i3 desktop | i3 X11, LightDM, Polybar, Rofi, i3lock-color, Greenclip, Alacritty, Thunar |
-| Browser | Brave, default for HTTP, HTTPS and HTML |
-| Office | LibreOffice Writer, Calc and Impress |
-| Development | Node.js24, npm, Python3 |
-| Applications | Flatpak available; no automatically installed Flathub apps |
-| System packages | RPM/DNF5 with signed Fedora44 repositories and the official signed Brave repository |
+| ![KDE application menu](images/KDE-Menu.png) | ![KDE live desktop and welcome window](images/KDE-Live.png) |
 
-Firefox, Fedora bookmarks and the optional Fedora Media Writer application are removed. The live desktop has one **Install VIGIL OS** launcher using Anaconda. Installed systems remove live-only shortcuts, the live account, passwordless live sudo and autologin. Users create their own account in the actual installer; no preconfigured privileged account ships.
+### i3
 
-SELinux remains Enforcing on live and installed boots. Anaconda temporarily changes enforcement while installing and restores it on normal exit. Guided storage uses Btrfs root/home, ext4 `/boot` and a FAT EFI partition for UEFI. Native hardware, proprietary GPU drivers and Secure Boot acceptance remain outside the completed VM evidence. Fresh acceptance uses six-GiB guests; the older candidate033 also exercised four-GiB installation. Neither establishes a universal hardware minimum.
+| Desktop | Login |
+| --- | --- |
+| ![VIGIL OS i3 desktop with Polybar](images/i3-desktop.png) | ![VIGIL OS i3 LightDM login screen](images/i3-login.png) |
 
-## Branding
+## Build the ISO
 
-GRUB, Plymouth, SDDM, Plasma splash, wallpaper, welcome and installer use VIGIL OS. Images preserve their aspect ratios; Plymouth uses the upstream Fedora watermark canvas footprint. The active dark wallpaper variants are user-supplied at 1920×1080, 2560×1600, 3440×1440 and 3840×2160. Their creation/upscale history is unknown; the previous city source remains historical. The product wallpaper lives under `/usr/share/vigilos/wallpapers`; a small product RPM provides the native `F44` wallpaper compatibility directory while preserving Plasma dependencies and original base-art attribution. Public artwork is readable by ordinary desktop users. Existing third-party theme authors, licenses and compatibility IDs are retained. Fedora repository names, signing keys, boot-component provenance, licenses and compatibility metadata intentionally retain their upstream identity.
-
-## Build and test
-
-Run one command as your normal host user:
+The host needs Bash, Python 3, curl, gpgv, OpenSSH client tools, xorriso, QEMU, qemu-img and working KVM access. Run the script as your normal user from the repository directory:
 
 ```bash
 bash scripts/build-and-brand.sh
 ```
 
-This builds separate KDE and i3 ISOs using verified official Fedora input and a fresh disposable builder for each. Select one with `--desktop kde` or `--desktop i3`; use `--check` for source/prerequisite checks only. Output ISOs, SHA256 files and build-evidence archives are placed in a fresh timestamped directory under `.build/output/`. No existing output is overwritten. Host dependencies are checked, never installed automatically; all package operations and mounts run inside the builder.
+The default builds both editions in sequence. To build one edition or check the source and prerequisites first:
 
-Automatic numbering was initialized for **1.3 (Loopback)**; read `version.json` for the current next version. `version.json` keeps the manually controlled first number/codename and the next automatic second number. Both editions in one run share a version, and deleting `.build` does not reset the counter. The versioning change passed source and regression checks; no new ISO has been rebuilt for this change. See [the versioning record](docs/VERSIONING-2026-10-25.md).
+```bash
+bash scripts/build-and-brand.sh --desktop kde
+bash scripts/build-and-brand.sh --desktop i3
+bash scripts/build-and-brand.sh --check
+```
 
-See [the complete build guide](docs/BUILD.md) for requirements, workspace/cache options, i3 shortcuts and script organization. The i3 edition uses your portable dotfile theme with Polybar, Rofi, i3lock-color, Greenclip, Alacritty and LightDM; it omits NVIDIA-specific bar modules and personal machine settings. Both editions use the supplied dark faded-mark wallpaper, with resolution variants; KDE defaults to the PurPurNight Plasma style and VIGIL Dark palette. Original candidate033 evidence remains historical; new clean-build and live-test evidence is recorded separately.
+The script verifies the Fedora inputs and builds each edition in a fresh disposable VM with 6 GiB of RAM and four CPUs. Package installation, mounts and image preparation run inside that VM. Missing host dependencies are reported for you to install separately.
 
-## SIERRA roadmap
+ISOs, SHA256 checksum files and build evidence are saved under `.build/output/<timestamp>/`. Existing outputs are preserved. Build logs and private temporary VM files stay in `.build/`; do not publish that directory. Workspace, cache and output options are listed by `bash scripts/build-and-brand.sh --help`.
 
-[SIERRA desktop integration](docs/SIERRA-INTEGRATION-PLAN.md) is a future development proposal. No SIERRA services, launchers or automation are implemented by this theme change.
+Product versions use `build_number.version_number`. The first number and codename are changed manually in `version.json` for a larger release. Each real build advances the second number once; both editions built together share it. The sequence goes from `1.9` to `1.10`. Checks do not advance it, and deleting `.build` does not reset it. A failed build after version reservation still consumes its number.
 
-## Package manager roadmap
+## Future plans
 
-[VpM](VPM.md) describes the intended native `.vpm` format, signed catalog and transaction architecture. No Rust implementation or native engine is present in this checkout. The initial prototype should inspect/build packages and plan read-only transactions before disposable-root installation. RPM-owned system files remain under rpmdb until an explicit ownership/migration design exists; SQLite commits alone are not OS rollback. AI-generated recipes are untrusted input and must not execute root commands or bypass signatures automatically. The shipping candidate uses supported RPM/DNF5 updates.
+SIERRA desktop integration is planned, with a Plasma search field, an i3 Rofi prompt and a shared task window. The initial work would cover conversation, selected files and a small set of tested application actions with explicit permissions. General GUI automation would remain experimental. SIERRA integration is not implemented in this checkout.
 
-## Project map
+[VpM](VPM.md) describes a proposed native package format and package manager. It has no implementation in this checkout. RPM and DNF5 remain responsible for the system.
 
-- `scripts/`: guarded build, branding, package and verification entry points.
-- `branding/`, `Skel/`, `PLASMA-CONFIGS/`: product assets and desktop defaults.
-- `docs/`: current validation and isolated workflow; `docs/history/` holds superseded handoffs.
-- `CLAUDE.md`: current project instructions and evidence locations.
-- `blueprints/`, `kickstarts/`: package references and legacy alternatives.
+[AI.md](AI.md) contains the build architecture, development rules, validation references and detailed future plans.
 
-Upstream legal notices and licenses are retained. See `LICENSE` and individual asset/package notices. No public release, push or signing infrastructure was created by this work.
+## Licence
 
-Current repaired ISO paths, checksums, actual tests and limitations are listed in [the repaired-build report](docs/REPAIRED-BUILD-VALIDATION-2026-10-24.md). The [original manual-build report](docs/MANUAL-BUILD-VALIDATION-2026-10-24.md) retains the original artifact hashes and three failures. The previous [dark-theme validation record](docs/DARK-THEME-VALIDATION.md) describes earlier artifacts. The [22 October script-cleanup record](docs/VALIDATION-2026-10-22.md) remains historical. The earlier candidate033 BIOS/UEFI installations and display matrix remain in [the historical record](docs/VALIDATION-2026-10-21.md).
+VIGIL-owned original material is available under the [VIGIL Personal Build Licence](LICENSE). It permits cloning and building an unmodified copy for personal use, with the documented build and version settings. It requires the branding to remain intact and prohibits commercial redistribution, modification and reuse of covered material in other projects.
+
+These are source-available terms. Fedora, imported software and artwork retain their own licences. Existing GPL grants and rights in GPL-covered derivatives remain in effect; the VIGIL terms do not override them. See [LICENSES](LICENSES) and the notices supplied with individual components.
+
+## Developer
+
+Created and maintained by Brad Heffernan for [VIGIL GLM](https://vigilglm.ai).

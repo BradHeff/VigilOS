@@ -1,0 +1,16 @@
+VIGIL OS contains material under several licences.
+
+The root LICENSE applies only to eligible VIGIL-owned original material.
+The previous root GPLv3 text is preserved in GPL-3.0-only.txt; prior GPL
+grants and applicable upstream or copyleft licences remain effective.
+
+Imported themes, icons, fonts and helpers retain their file-level notices.
+These include the PurPur themes, the imported GTK and icon themes, the
+Git prompt helper, hfetch, Rofi themes, Iosevka and Feather fonts, Greenclip
+and i3lock-color. Keep their original authors and licences. This list is
+not a substitute for the notices and licence files distributed with them.
+
+Fedora packages, repositories, keys, signed boot components and their
+licences retain upstream provenance. Runtime RPM licensing metadata must
+identify the applicable licences, and public binary distribution must meet
+each component licence, including corresponding-source obligations.

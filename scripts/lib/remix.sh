@@ -1,11 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-# VIGIL OS fresh official Fedora live-image preparation
-# Applies: SDDM, Plasma, Plymouth, GRUB, icons, cursors, wallpapers, logos, skel
-# Replaces GNOME with KDE Plasma, GDM with SDDM
-# Creates live user with autologin, removes on install
-
 BUILD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$BUILD_DIR/scripts/lib/require-builder.sh"
 vigilos_require_builder
@@ -20,13 +15,12 @@ ISO_LABEL_DEFAULT="VIGILOS-${VIGIL_VERSION//./-}-${DESKTOP}-x86_64"
 
 input_iso="${1:-}"
 output_iso="${2:-$BUILD_DIR/VIGILOS-${VIGIL_VERSION}-${DESKTOP}-x86_64.iso}"
-# Absolutize paths now: the script cd's into $WORK_DIR later, so a relative
-# output name would otherwise drop the ISO inside the work directory.
+
 input_iso="$(readlink -f "$input_iso")"
 output_iso="$(readlink -m "$output_iso")"
 [[ ! -e "$output_iso" ]] || { echo "ERROR: Refusing to overwrite $output_iso" >&2; exit 1; }
 mkdir -p "$(dirname "$output_iso")"
-# Derive an ISO label that matches the output filename unless overridden
+
 ISO_LABEL="${ISO_LABEL:-$ISO_LABEL_DEFAULT}"
 [[ -z "$ISO_LABEL" ]] && ISO_LABEL="$ISO_LABEL_DEFAULT"
 
@@ -35,7 +29,7 @@ if [[ -z "$input_iso" || ( ! -f "$input_iso" && ! -b "$input_iso" ) ]]; then
     exit 1
 fi
 
-# Cleanup function - handles ALL exit scenarios including Ctrl+C
+# Release mounts and loop devices owned by this build.
 cleanup_mounts() {
     local exit_code=$?
 
@@ -44,7 +38,6 @@ cleanup_mounts() {
         echo "ERROR: Script failed (exit code: $exit_code). Cleaning up mounts..."
     fi
 
-    # Unmount bind mounts first (in reverse order) - critical to prevent /dev/null errors
     for mount_point in run sys proc dev; do
         sudo umount -l "$WORK_DIR/squashfs/rootfs/$mount_point" 2>/dev/null || true
         sudo umount -l "$WORK_DIR/squashfs/$mount_point" 2>/dev/null || true
@@ -52,20 +45,15 @@ cleanup_mounts() {
 
     sleep 1
 
-    # Unmount EFI image if mounted
     sudo umount -l "$WORK_DIR/efi" 2>/dev/null || true
     sudo umount -l "$WORK_DIR/erofs" 2>/dev/null || true
 
-    # Unmount rootfs.img if mounted
     sudo umount -l "$WORK_DIR/squashfs/rootfs" 2>/dev/null || true
 
-    # Unmount squashfs
     sudo umount -l "$WORK_DIR/squashfs" 2>/dev/null || true
 
-    # Unmount ISO
     sudo umount -l "$WORK_DIR/iso" 2>/dev/null || true
 
-    # Detach loop devices
     for loop in $(losetup -a 2>/dev/null | grep "$WORK_DIR" | cut -d: -f1); do
         sudo losetup -d "$loop" 2>/dev/null || true
     done
@@ -83,17 +71,15 @@ echo "Input : $input_iso"
 echo "Output: $output_iso"
 echo ""
 
-# Each run owns a fresh work directory; preserve previous runs and their evidence.
 mkdir -p "$WORK_DIR"/{iso,squashfs,new_iso,efi}
 touch "$WORK_DIR/.vigilos-owned"
 
-# Render into this run's private branding copy; preserve source raster baselines.
 SOURCE_BRANDING_DIR="$BRANDING_DIR"
 BRANDING_DIR="$WORK_DIR/branding"
 rsync -a "$SOURCE_BRANDING_DIR/" "$BRANDING_DIR/"
 "$BUILD_DIR/scripts/lib/prepare-brand-assets.sh" "$BRANDING_DIR"
 
-# Helper function
+# Copy an optional source asset into the prepared image.
 copy_if_exists() {
     local src="$1" dest="$2"
     [[ -e "$src" ]] || return 0
@@ -101,7 +87,7 @@ copy_if_exists() {
     sudo cp -r "$src" "$dest"
 }
 
-# Match the installed Fedora 44 spinner watermark bounds, preserving aspect.
+# Fit the product watermark to the native Plymouth canvas.
 make_plymouth_watermark() {
     local src="$BRANDING_DIR/logos/vigilos-watermark.png"
     local dest="$WORK_DIR/vigilos-plymouth-watermark.png"
@@ -135,7 +121,6 @@ else
     sudo unsquashfs -d "$WORK_DIR/squashfs" "$WORK_DIR/iso/LiveOS/squashfs.img" > /dev/null
 fi
 
-# Detect format and set ROOTFS_DIR
 ROOTFS_IMG=$(sudo find "$WORK_DIR/squashfs" -maxdepth 2 -name "rootfs.img" 2>/dev/null | head -1)
 MOUNTED_ROOTFS=false
 if [[ -n "$ROOTFS_IMG" ]]; then
@@ -149,26 +134,21 @@ else
     ROOTFS_DIR="$WORK_DIR/squashfs"
 fi
 
-# Bind mounts for chroot operations
 echo "Setting up chroot environment..."
 sudo mount --bind /dev "$ROOTFS_DIR/dev"
 sudo mount --bind /proc "$ROOTFS_DIR/proc"
 sudo mount --bind /sys "$ROOTFS_DIR/sys"
 sudo mount --bind /run "$ROOTFS_DIR/run"
 
-# Preserve the original resolver configuration; builder DNS is temporary.
 if [[ -e "$ROOTFS_DIR/etc/resolv.conf" || -L "$ROOTFS_DIR/etc/resolv.conf" ]]; then
     sudo cp -a "$ROOTFS_DIR/etc/resolv.conf" "$WORK_DIR/resolv.conf.original"
 fi
-# Ensure DNS works in chroot
+
 if [[ -L "$ROOTFS_DIR/etc/resolv.conf" ]]; then
     sudo rm -f "$ROOTFS_DIR/etc/resolv.conf"
 fi
 sudo cp -L /etc/resolv.conf "$ROOTFS_DIR/etc/resolv.conf"
 
-# ============================================
-# INSTALL KDE PLASMA / REMOVE GNOME
-# ============================================
 echo ""
 echo "=== Updating Fedora base from signed official repositories ==="
 sudo chroot "$ROOTFS_DIR" dnf upgrade -y --releasever=44 --refresh
@@ -203,7 +183,6 @@ else
     sudo chroot "$ROOTFS_DIR" dnf -y --releasever=44 install anaconda-live anaconda-webui grub2-efi-x64 grub2-efi-x64-modules shim-x64 grub2-tools grub2-tools-extra efibootmgr grub2-common plymouth plymouth-plugin-script plymouth-plugin-two-step dracut dracut-live dracut-config-generic selinux-policy-targeted policycoreutils policycoreutils-python-utils rsync git fastfetch
 fi
 
-# User-selected flagship browser, signed vendor RPM repository and runtime tools.
 sudo env VIGIL_BUILD_GUEST=1 bash "$BUILD_DIR/scripts/lib/install-default-apps.sh" "$ROOTFS_DIR"
 
 echo "Removing GNOME packages..."
@@ -212,9 +191,6 @@ sudo chroot "$ROOTFS_DIR" dnf remove -y --releasever=44 --noautoremove \
     gdm gnome-control-center gnome-settings-daemon \
     2>/dev/null || true
 
-# ============================================
-# CONFIGURE DISPLAY MANAGER (SDDM)
-# ============================================
 echo ""
 echo "=== Configuring SDDM and Plasma Session ==="
 
@@ -224,26 +200,21 @@ sudo chroot "$ROOTFS_DIR" systemctl enable sddm.service 2>/dev/null || true
 sudo rm -f "$ROOTFS_DIR/etc/systemd/system/display-manager.service"
 sudo ln -sf /usr/lib/systemd/system/sddm.service "$ROOTFS_DIR/etc/systemd/system/display-manager.service"
 
-# ============================================
-# CREATE LIVE USER
-# ============================================
 echo ""
 echo "=== Creating Live User ==="
 
 if ! sudo chroot "$ROOTFS_DIR" id liveuser &>/dev/null; then
     sudo chroot "$ROOTFS_DIR" useradd -m -G wheel -s /bin/bash liveuser 2>/dev/null || true
 fi
-# The live account may already exist in Fedora media; unlock it during the build.
+
 sudo chroot "$ROOTFS_DIR" passwd -d liveuser
 
 sudo mkdir -p "$ROOTFS_DIR/home/liveuser/.config"
 sudo mkdir -p "$ROOTFS_DIR/home/liveuser/Desktop"
 
-# Passwordless sudo for live user
 echo "liveuser ALL=(ALL) NOPASSWD: ALL" | sudo tee "$ROOTFS_DIR/etc/sudoers.d/liveuser" > /dev/null
 sudo chmod 440 "$ROOTFS_DIR/etc/sudoers.d/liveuser"
 
-# Shared live-environment predicate (run only inside the image).
 sudo mkdir -p "$ROOTFS_DIR/usr/local/libexec"
 sudo tee "$ROOTFS_DIR/usr/local/libexec/vigilos-is-live" >/dev/null << 'IS_LIVE_EOF'
 #!/usr/bin/bash
@@ -259,9 +230,6 @@ fi
 IS_LIVE_EOF
 sudo chmod 0755 "$ROOTFS_DIR/usr/local/libexec/vigilos-is-live"
 
-# ============================================
-# LIVE SESSION AUTOLOGIN SERVICE
-# ============================================
 echo "  - Creating live session autologin service..."
 sudo tee "$ROOTFS_DIR/etc/systemd/system/sddm-live-autologin.service" > /dev/null << 'LIVE_AUTOLOGIN_EOF'
 [Unit]
@@ -289,9 +257,6 @@ LIVE_AUTOLOGIN_EOF
 
 sudo chroot "$ROOTFS_DIR" systemctl enable sddm-live-autologin.service 2>/dev/null || true
 
-# ============================================
-# LIVEUSER SETUP SERVICE (ensures configs on boot)
-# ============================================
 echo "  - Creating liveuser setup service..."
 sudo tee "$ROOTFS_DIR/etc/systemd/system/liveuser-setup.service" > /dev/null << 'LIVEUSER_SERVICE'
 [Unit]
@@ -316,8 +281,7 @@ if ! id liveuser >/dev/null 2>&1; then useradd -m -G wheel -s /bin/bash liveuser
 passwd -d liveuser
 mkdir -p /home/liveuser/Desktop /home/liveuser/.config
 rsync -a --ignore-existing /etc/skel/ /home/liveuser/
-# Fedora's live setup creates its shortcut and welcome config before this unit.
-# Use the product entry rather than showing a second Fedora installer icon.
+
 rm -f /home/liveuser/Desktop/liveinst.desktop
 printf '[General]\nLiveEnvironment=false\nLiveInstaller=vigilos-installer\n' > /home/liveuser/.config/plasma-welcomerc
 chown -R liveuser:liveuser /home/liveuser
@@ -327,9 +291,6 @@ bash -n "$ROOTFS_DIR/usr/local/libexec/vigilos-liveuser-setup"
 
 sudo chroot "$ROOTFS_DIR" systemctl enable liveuser-setup.service 2>/dev/null || true
 
-# ============================================
-# FIRST-BOOT SERVICE (removes liveuser after install)
-# ============================================
 echo "  - Creating first-boot cleanup service..."
 sudo tee "$ROOTFS_DIR/etc/systemd/system/vigilos-first-boot.service" > /dev/null << 'FIRSTBOOT_EOF'
 [Unit]
@@ -349,11 +310,9 @@ RemainAfterExit=yes
 WantedBy=multi-user.target
 FIRSTBOOT_EOF
 
-# Create the first-boot script (easier to debug than inline)
 sudo tee "$ROOTFS_DIR/usr/local/bin/vigilos-first-boot.sh" > /dev/null << 'FIRSTBOOT_SCRIPT'
 #!/bin/bash
-# Installed-system cleanup. Branding and initramfs are prepared during the build
-# and installer; avoid an expensive relabel/rebuild on the first desktop boot.
+
 set -euo pipefail
 LOG=/var/log/vigilos-first-boot.log
 exec >>"$LOG" 2>&1
@@ -380,43 +339,24 @@ FIRSTBOOT_SCRIPT
 sudo chmod +x "$ROOTFS_DIR/usr/local/bin/vigilos-first-boot.sh"
 sudo chroot "$ROOTFS_DIR" systemctl enable vigilos-first-boot.service 2>/dev/null || true
 
-# Also create symlink manually as backup (in case chroot systemctl fails)
 sudo mkdir -p "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants"
 sudo ln -sf /etc/systemd/system/vigilos-first-boot.service "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants/vigilos-first-boot.service" 2>/dev/null || true
 
-# ============================================
-# GPU DRIVER SETUP (multi-vendor, installed system only)
-# ============================================
-# Goal: boot freely into the live environment on ANY GPU, and on an INSTALLED
-# system pull the right accelerated driver automatically.
-#
-#   * NVIDIA: nouveau cannot drive Ada Lovelace / RTX 40xx (and is shaky on
-#     several newer cards) -> live & pre-driver boots use the nouveau blacklist
-#     in the kernel cmdline (simpledrm framebuffer). On first boot of an
-#     installed system this service installs akmod-nvidia from RPM Fusion and
-#     builds the kmod, then notifies the user to reboot into the real driver.
-#   * AMD (amdgpu) / Intel (i915): in-kernel KMS already works out of the box,
-#     so nothing to install -- the blacklist does not touch them.
-#
-# This runs in its own network-gated, marker-guarded oneshot service so any
-# failure (no network, repo down) is isolated and never blocks the desktop.
 echo "  - Creating GPU driver setup service..."
 
 sudo tee "$ROOTFS_DIR/usr/local/bin/vigilos-gpu-setup.sh" > /dev/null << 'GPUSETUP_SCRIPT'
 #!/bin/bash
-# VIGILOS GPU setup - optional, installed-system-only, retries after failure.
+
 set -euo pipefail
 LOG="/var/log/vigilos-gpu-setup.log"
 echo "$(date): VIGILOS GPU setup starting" >> "$LOG"
 
-# Never run in the live environment.
 if [ -d /run/initramfs/live ] || grep -q "rd.live" /proc/cmdline 2>/dev/null; then
     echo "$(date): live environment - skipping GPU setup" >> "$LOG"
     exit 0
 fi
 
-# Detect an NVIDIA display controller without depending on pciutils:
-# PCI vendor 0x10de + class VGA (0x0300xx) or 3D controller (0x0302xx).
+# Detect NVIDIA display controllers from sysfs.
 nvidia_present() {
     local v cls dev
     for v in /sys/bus/pci/devices/*/vendor; do
@@ -438,17 +378,16 @@ fi
 
 echo "$(date): NVIDIA GPU detected - installing proprietary driver" >> "$LOG"
 
-# RPM Fusion (free + nonfree) provides akmod-nvidia.
 dnf install -y \
     "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm" \
     "https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm" \
     >> "$LOG" 2>&1 || { echo "$(date): ERROR repository setup failed; retry next boot" >> "$LOG"; exit 1; }
 
 if dnf install -y akmod-nvidia xorg-x11-drv-nvidia-cuda >> "$LOG" 2>&1; then
-    # Build the kmod now so the driver is ready on the next boot.
+
     akmods --force >> "$LOG" 2>&1 || { echo "$(date): ERROR module build failed; retry next boot" >> "$LOG"; exit 1; }
     modinfo -k "$(uname -r)" nvidia >> "$LOG" 2>&1 || { echo "$(date): ERROR NVIDIA module unavailable; retry next boot" >> "$LOG"; exit 1; }
-    # Flag for the per-user notifier (autostart) to prompt a reboot.
+
     touch /var/lib/vigilos-nvidia-ready
     echo "$(date): akmod-nvidia installed; reboot flag set" >> "$LOG"
 else
@@ -480,16 +419,13 @@ RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
 GPUSETUP_EOF
-# Keep this opt-in unit disabled so it cannot pull network-online.target into
-# the normal boot transaction merely to skip its third-party condition.
+
 sudo chroot "$ROOTFS_DIR" systemctl disable vigilos-gpu-setup.service 2>/dev/null || true
 sudo rm -f "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants/vigilos-gpu-setup.service"
 
-# Per-user notifier: when the NVIDIA driver has been built, prompt to reboot.
 sudo tee "$ROOTFS_DIR/usr/local/bin/vigilos-gpu-notify.sh" > /dev/null << 'GPUNOTIFY_SCRIPT'
 #!/bin/bash
-# Shown via KDE autostart. Prompts the user to reboot once the NVIDIA driver
-# has been installed/built, then marks itself shown for this user.
+
 [ -f /var/lib/vigilos-nvidia-ready ] || exit 0
 SHOWN="$HOME/.config/vigilos-nvidia-notified"
 [ -f "$SHOWN" ] && exit 0
@@ -508,7 +444,6 @@ mkdir -p "$HOME/.config" && touch "$SHOWN"
 GPUNOTIFY_SCRIPT
 sudo chmod +x "$ROOTFS_DIR/usr/local/bin/vigilos-gpu-notify.sh"
 
-# Autostart entry seeded into /etc/skel so every user gets the one-time prompt.
 sudo mkdir -p "$ROOTFS_DIR/etc/skel/.config/autostart"
 sudo tee "$ROOTFS_DIR/etc/skel/.config/autostart/vigilos-gpu-notify.desktop" > /dev/null << 'GPUNOTIFY_DESKTOP'
 [Desktop Entry]
@@ -521,9 +456,6 @@ OnlyShowIn=KDE;
 NoDisplay=true
 GPUNOTIFY_DESKTOP
 
-# ============================================
-# PLYMOUTH THEME
-# ============================================
 echo ""
 echo "=== Applying Plymouth Boot Splash ==="
 
@@ -545,8 +477,6 @@ for key in ['BackgroundStartColor','BackgroundEndColor']:c['two-step'][key]='0x1
 with open(p,'w') as f:c.write(f,space_around_delimiters=False)
 PLYMOUTH_DARK
 
-    # Configure Plymouth - use spinner theme with VIGILOS watermark for reliability
-    # The vigilos theme uses two-step which may not work on all systems
     sudo mkdir -p "$ROOTFS_DIR/etc/plymouth"
     sudo tee "$ROOTFS_DIR/etc/plymouth/plymouthd.conf" >/dev/null <<'PLYCONF'
 [Daemon]
@@ -555,113 +485,100 @@ ShowDelay=0
 DeviceTimeout=8
 PLYCONF
 
-    # Replace watermarks in spinner and bgrt themes with VIGILOS logo
-    # Use pre-generated 128x128 watermark (original is 980x980 which fills entire screen)
     echo "  - Replacing Plymouth watermarks..."
     PLYMOUTH_LOGO=""
 
     PLYMOUTH_LOGO="$(make_plymouth_watermark)"
 
-    # Only replace if we have a valid watermark
     if [[ -n "$PLYMOUTH_LOGO" && -f "$PLYMOUTH_LOGO" ]]; then
-        # Replace in spinner theme (boot)
+
         if [[ -d "$ROOTFS_DIR/usr/share/plymouth/themes/spinner" ]]; then
             sudo cp "$PLYMOUTH_LOGO" "$ROOTFS_DIR/usr/share/plymouth/themes/spinner/watermark.png"
             echo "    - Replaced spinner watermark"
         fi
 
-        # Replace in bgrt theme
         if [[ -d "$ROOTFS_DIR/usr/share/plymouth/themes/bgrt" ]]; then
             sudo cp "$PLYMOUTH_LOGO" "$ROOTFS_DIR/usr/share/plymouth/themes/bgrt/watermark.png"
             echo "    - Replaced bgrt watermark"
         fi
 
-        # Replace in hot theme (shutdown/reboot - the red/green arrows theme)
         if [[ -d "$ROOTFS_DIR/usr/share/plymouth/themes/hot" ]]; then
             sudo cp "$PLYMOUTH_LOGO" "$ROOTFS_DIR/usr/share/plymouth/themes/hot/watermark.png"
-            # Also replace any logo files in hot theme
+
             for logo_file in "$ROOTFS_DIR/usr/share/plymouth/themes/hot/"*logo*.png; do
                 [[ -f "$logo_file" ]] && sudo cp "$PLYMOUTH_LOGO" "$logo_file"
             done
             echo "    - Replaced hot theme watermark (shutdown/reboot)"
         fi
 
-        # Replace in tribar theme (another shutdown theme variant)
         if [[ -d "$ROOTFS_DIR/usr/share/plymouth/themes/tribar" ]]; then
             sudo cp "$PLYMOUTH_LOGO" "$ROOTFS_DIR/usr/share/plymouth/themes/tribar/watermark.png"
             echo "    - Replaced tribar watermark"
         fi
 
-        # Replace in text theme
         if [[ -d "$ROOTFS_DIR/usr/share/plymouth/themes/text" ]]; then
             sudo cp "$PLYMOUTH_LOGO" "$ROOTFS_DIR/usr/share/plymouth/themes/text/watermark.png" 2>/dev/null || true
         fi
 
-        # Also replace the logo.png in vigilos theme
         if [[ -d "$ROOTFS_DIR/usr/share/plymouth/themes/vigilos" ]]; then
             sudo cp "$PLYMOUTH_LOGO" "$ROOTFS_DIR/usr/share/plymouth/themes/vigilos/logo.png"
             echo "    - Replaced vigilos theme logo"
         fi
 
-        # Replace watermark in ALL Plymouth themes to be safe
         echo "    - Replacing watermarks in all Plymouth themes..."
         for theme_dir in "$ROOTFS_DIR/usr/share/plymouth/themes/"*/; do
             [[ -d "$theme_dir" ]] || continue
             theme_name=$(basename "$theme_dir")
-            # Replace watermark.png if it exists
+
             if [[ -f "${theme_dir}watermark.png" ]]; then
                 sudo cp "$PLYMOUTH_LOGO" "${theme_dir}watermark.png"
             fi
-            # Replace any file with 'logo' in the name
+
             for logo_file in "${theme_dir}"*logo*.png "${theme_dir}"*Logo*.png; do
                 [[ -f "$logo_file" ]] && sudo cp "$PLYMOUTH_LOGO" "$logo_file"
             done
         done
     fi
 
-    # Clean up temp file if we created one
-    # Keep generated watermark with this run's build evidence.
-
-    # Configure Plymouth for installed system
     echo "  - Configuring Plymouth for installed system..."
 
-    # Create dracut configuration to include Plymouth
     sudo mkdir -p "$ROOTFS_DIR/etc/dracut.conf.d"
     sudo tee "$ROOTFS_DIR/etc/dracut.conf.d/plymouth.conf" > /dev/null << 'DRACUTCONF'
 # Include Plymouth in initramfs for boot splash
 add_dracutmodules+=" plymouth "
 DRACUTCONF
 
-    # Create dracut module to ensure VIGILOS branding is in initramfs
     echo "  - Creating dracut module for VIGILOS plymouth branding"
     sudo mkdir -p "$ROOTFS_DIR/usr/lib/dracut/modules.d/99vigilos-branding"
     sudo tee "$ROOTFS_DIR/usr/lib/dracut/modules.d/99vigilos-branding/module-setup.sh" > /dev/null << 'DRACUT_MODULE'
 #!/bin/bash
-# VIGILOS Plymouth branding dracut module
 
+# Include the product branding module in generated initramfs images.
 check() {
     return 0
 }
 
+# Require the native Plymouth dracut module.
 depends() {
     echo plymouth
     return 0
 }
 
+# Install product splash assets and configuration into the initramfs.
 install() {
-    # Install VIGILOS watermark to spinner theme in initramfs
+
     if [ -f /usr/share/plymouth/themes/spinner/watermark.png ]; then
         inst_simple /usr/share/plymouth/themes/spinner/watermark.png
     fi
-    # Install to bgrt theme as well
+
     if [ -f /usr/share/plymouth/themes/bgrt/watermark.png ]; then
         inst_simple /usr/share/plymouth/themes/bgrt/watermark.png
     fi
-    # Install to tribar theme (shutdown/reboot)
+
     if [ -f /usr/share/plymouth/themes/tribar/watermark.png ]; then
         inst_simple /usr/share/plymouth/themes/tribar/watermark.png
     fi
-    # Install VIGILOS theme if available
+
     if [ -d /usr/share/plymouth/themes/vigilos ]; then
         inst_dir /usr/share/plymouth/themes/vigilos
         for f in /usr/share/plymouth/themes/vigilos/*; do
@@ -672,7 +589,7 @@ install() {
     for f in /usr/share/plymouth/themes/vigilos-spinner/*; do
         [ -f "$f" ] && inst_simple "$f"
     done
-    # Ensure Plymouth config is in initramfs
+
     if [ -f /etc/plymouth/plymouthd.conf ]; then
         inst_simple /etc/plymouth/plymouthd.conf
     fi
@@ -680,7 +597,6 @@ install() {
 DRACUT_MODULE
     sudo chmod +x "$ROOTFS_DIR/usr/lib/dracut/modules.d/99vigilos-branding/module-setup.sh"
 
-    # Create dracut configuration to always include the branding module
     sudo tee "$ROOTFS_DIR/etc/dracut.conf.d/vigilos-branding.conf" > /dev/null << 'DRACUT_CONF'
 # VIGILOS branding - include plymouth watermarks in initramfs
 add_dracutmodules+=" vigilos-branding "
@@ -688,16 +604,12 @@ add_dracutmodules+=" vigilos-branding "
 compress="zstd -3 -q -T1"
 DRACUT_CONF
 
-    # Set Plymouth default theme to spinner (with VIGILOS watermark)
     if [[ -f "$ROOTFS_DIR/usr/sbin/plymouth-set-default-theme" ]]; then
         sudo ln -sf /usr/share/plymouth/themes/vigilos-spinner/vigilos-spinner.plymouth "$ROOTFS_DIR/etc/alternatives/default.plymouth" 2>/dev/null || true
         sudo chroot "$ROOTFS_DIR" plymouth-set-default-theme vigilos-spinner 2>/dev/null || true
     fi
 fi
 
-# ============================================
-# GRUB THEME (inside rootfs for installed system)
-# ============================================
 echo ""
 echo "=== Applying GRUB Theme ==="
 
@@ -706,12 +618,10 @@ if [[ -d "$BRANDING_DIR/grub/vigilos" ]]; then
     sudo mkdir -p "$ROOTFS_DIR/boot/grub2/themes/vigilos"
     sudo cp -r "$BRANDING_DIR/grub/vigilos/"* "$ROOTFS_DIR/boot/grub2/themes/vigilos/"
 
-    # Also copy to /usr/share for installed system (first-boot will copy to /boot)
     echo "  - Copying GRUB theme to /usr/share for installed system..."
     sudo mkdir -p "$ROOTFS_DIR/usr/share/grub/themes/vigilos"
     sudo cp -r "$BRANDING_DIR/grub/vigilos/"* "$ROOTFS_DIR/usr/share/grub/themes/vigilos/"
 
-    # Generate GRUB fonts
     echo "  - Generating GRUB fonts..."
     GRUB_MKFONT=""
     if command -v grub2-mkfont &> /dev/null; then
@@ -734,7 +644,6 @@ if [[ -d "$BRANDING_DIR/grub/vigilos" ]]; then
         fi
     fi
 
-    # Copy unicode.pf2 fallback
     if [[ -f /usr/share/grub/unicode.pf2 ]]; then
         sudo cp /usr/share/grub/unicode.pf2 "$ROOTFS_DIR/boot/grub2/themes/vigilos/" 2>/dev/null || true
     elif [[ -f /boot/grub2/fonts/unicode.pf2 ]]; then
@@ -743,19 +652,12 @@ if [[ -d "$BRANDING_DIR/grub/vigilos" ]]; then
 
     sudo cp "$ROOTFS_DIR/boot/grub2/themes/vigilos/"*.pf2 "$ROOTFS_DIR/usr/share/grub/themes/vigilos/"
 
-    # Configure GRUB defaults
     echo "  - Configuring GRUB defaults..."
     sudo sed -i '/^GRUB_THEME=/d;/^GRUB_DISTRIBUTOR=/d;/^GRUB_DISABLE_OS_PROBER=/d;/^GRUB_GFXMODE=/d;/^GRUB_GFXPAYLOAD_LINUX=/d' "$ROOTFS_DIR/etc/default/grub" 2>/dev/null || true
 
-    # Ensure rhgb quiet is in GRUB_CMDLINE_LINUX for Plymouth splash.
-    # Also blacklist nouveau so a disk-installed VIGILOS boots to a desktop on
-    # NVIDIA Ada Lovelace / RTX 40xx hardware (nouveau KMS = black screen there).
-    # The akmod-nvidia proprietary driver (installed at first boot by
-    # vigilos-gpu-setup.service) blacklists nouveau itself once present, so this
-    # is the pre-driver safety net that gets us to a desktop on any GPU.
     GRUB_EXTRA_CMDLINE="rhgb quiet rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0"
     if grep -q "^GRUB_CMDLINE_LINUX=" "$ROOTFS_DIR/etc/default/grub" 2>/dev/null; then
-        # Add rhgb quiet if not already present
+
         if ! grep -q "rhgb" "$ROOTFS_DIR/etc/default/grub"; then
             sudo sed -i "s/^GRUB_CMDLINE_LINUX=\"\(.*\)\"/GRUB_CMDLINE_LINUX=\"\1 ${GRUB_EXTRA_CMDLINE}\"/" "$ROOTFS_DIR/etc/default/grub"
         fi
@@ -776,13 +678,9 @@ GRUB_TERMINAL_OUTPUT="gfxterm"
 GRUBCONF
 fi
 
-# ============================================
-# GRUB THEME ON ISO BOOT (EFI and BIOS)
-# ============================================
 echo ""
 echo "=== Branding ISO Boot Menu ==="
 
-# Copy GRUB theme to ISO directories
 if [[ -d "$BRANDING_DIR/grub/vigilos" ]]; then
     echo "  - Copying GRUB theme to ISO..."
     sudo mkdir -p "$WORK_DIR/new_iso/EFI/BOOT/themes/vigilos"
@@ -790,7 +688,6 @@ if [[ -d "$BRANDING_DIR/grub/vigilos" ]]; then
     sudo mkdir -p "$WORK_DIR/new_iso/boot/grub2/themes/vigilos"
     sudo cp -r "$BRANDING_DIR/grub/vigilos/"* "$WORK_DIR/new_iso/boot/grub2/themes/vigilos/"
 
-    # Generate fonts for ISO theme directories
     if [[ -n "${GRUB_MKFONT:-}" ]]; then
         for THEME_DIR in "$WORK_DIR/new_iso/EFI/BOOT/themes/vigilos" "$WORK_DIR/new_iso/boot/grub2/themes/vigilos"; do
             sudo cp "$ROOTFS_DIR/boot/grub2/themes/vigilos/"*.pf2 "$THEME_DIR/"
@@ -804,12 +701,8 @@ if [[ -d "$BRANDING_DIR/grub/vigilos" ]]; then
         done
     fi
 
-    # Vector derivatives are already 8-bit RGBA PNG. Keep transparency so the
-    # mark has no opaque black rectangle on the GRUB background.
-
 fi
 
-# Update EFI GRUB config
 if [[ -f "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg" ]]; then
     echo "  - Updating EFI GRUB config..."
     sudo sed -i \
@@ -822,19 +715,11 @@ if [[ -f "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg" ]]; then
         -e "s/--class fedora/--class vigilos/g" \
         "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg"
 
-    # Keep enforcing SELinux for live boot plus splash flags.
-    # nouveau.modeset=0 + blacklist: nouveau has no working KMS on NVIDIA Ada
-    # Lovelace (RTX 40-series, e.g. 4080 = AD103) and similar new GPUs. Without
-    # this the GRUB/Plymouth splash shows (firmware framebuffer) but the desktop
-    # is a black screen with only an X cursor once nouveau tries to mode-set.
-    # Blacklisting it keeps the generic simpledrm/efifb framebuffer into the
-    # desktop. Targeted (not global nomodeset) so Intel/AMD iGPU KMS still works.
     sudo sed -i \
         -e '/^\s*linux/s/$/ selinux=1 enforcing=1 rhgb quiet rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0/' \
         -e '/^\s*linuxefi/s/$/ selinux=1 enforcing=1 rhgb quiet rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0/' \
         "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg"
 
-    # Add theme configuration
     if ! grep -q "set theme=" "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg"; then
         {
             echo '# VIGILOS GRUB Theme'
@@ -852,7 +737,6 @@ if [[ -f "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg" ]]; then
     fi
 fi
 
-# Update BIOS GRUB config
 if [[ -f "$WORK_DIR/new_iso/boot/grub2/grub.cfg" ]]; then
     echo "  - Updating BIOS GRUB config..."
     sudo sed -i \
@@ -865,9 +749,6 @@ if [[ -f "$WORK_DIR/new_iso/boot/grub2/grub.cfg" ]]; then
         -e "s/--class fedora/--class vigilos/g" \
         "$WORK_DIR/new_iso/boot/grub2/grub.cfg"
 
-    # Keep enforcing SELinux for live boot plus splash flags.
-    # See EFI block above for why nouveau is blacklisted (Ada Lovelace / RTX 40xx
-    # black-screen-with-cursor). Keep both blocks in sync.
     sudo sed -i \
         -e '/^\s*linux/s/$/ selinux=1 enforcing=1 rhgb quiet rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0/' \
         -e '/^\s*linuxefi/s/$/ selinux=1 enforcing=1 rhgb quiet rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0/' \
@@ -894,9 +775,6 @@ sudo python3 "$BUILD_DIR/scripts/lib/brand-grub.py" "$WORK_DIR/new_iso"
 grub2-script-check "$WORK_DIR/new_iso/boot/grub2/grub.cfg"
 grub2-script-check "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg"
 
-# ============================================
-# SDDM THEME
-# ============================================
 echo ""
 echo "=== Applying SDDM Theme ==="
 
@@ -912,7 +790,6 @@ if [[ -n "$SDDM_SRC" ]]; then
     sudo mkdir -p "$ROOTFS_DIR/usr/share/sddm/themes/vigilos"
     sudo cp -r "$SDDM_SRC/"* "$ROOTFS_DIR/usr/share/sddm/themes/vigilos/"
 
-    # Set VIGILOS logo as default face icon
     if [[ -f "$BRANDING_DIR/logos/vigilos-logo.png" ]]; then
         sudo mkdir -p "$ROOTFS_DIR/usr/share/sddm/faces"
         sudo cp "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/sddm/faces/.face.icon"
@@ -921,7 +798,6 @@ if [[ -n "$SDDM_SRC" ]]; then
     fi
 fi
 
-# SDDM configuration
 echo "  - Configuring SDDM..."
 sudo mkdir -p "$ROOTFS_DIR/etc/sddm.conf.d"
 sudo tee "$ROOTFS_DIR/etc/sddm.conf.d/vigilos.conf" >/dev/null <<'SDDMEOF'
@@ -940,28 +816,22 @@ ServerArguments=-nolisten tcp
 SessionDir=/usr/share/wayland-sessions
 SDDMEOF
 
-# ============================================
-# DARK PLASMA THEME AND PRODUCT DEFAULTS
-# ============================================
 echo ""
 echo "=== Applying VIGIL Dark Plasma Defaults ==="
 
 echo "  - Wallpapers..."
-# Copy VIGILOS wallpaper package (proper Plasma wallpaper structure)
+
 if [[ -d "$BRANDING_DIR/wallpapers/VIGILOS" ]]; then
     sudo mkdir -p "$ROOTFS_DIR/usr/share/vigilos/wallpapers/VIGILOS"
     sudo cp -r "$BRANDING_DIR/wallpapers/VIGILOS/"* "$ROOTFS_DIR/usr/share/vigilos/wallpapers/VIGILOS/"
 fi
-# Also copy standalone wallpapers for compatibility
 
-# Product wallpaper defaults are provided through a separate look-and-feel package.
-# Keep upstream F44 artwork/metadata unchanged; XDG overlays cover compatibility IDs.
 echo "  - Logos..."
 copy_if_exists "$BRANDING_DIR/logos" "$ROOTFS_DIR/usr/share/vigilos/logos"
 copy_if_exists "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/vigilos-logo.png"
-# Copy canonical normalized watermark for Plymouth first-boot regeneration
+
 sudo cp "$BRANDING_DIR/logos/vigilos-watermark.png" "$ROOTFS_DIR/usr/share/pixmaps/vigilos-watermark.png"
-# Retain the legacy square icon for compatibility, not for boot splash selection.
+
 if [[ -f "$BRANDING_DIR/logos/vigilos-watermark-128.png" ]]; then
     sudo cp "$BRANDING_DIR/logos/vigilos-watermark-128.png" "$ROOTFS_DIR/usr/share/pixmaps/vigilos-watermark-128.png"
     sudo cp "$BRANDING_DIR/logos/vigilos-watermark-128.png" "$ROOTFS_DIR/usr/share/vigilos/logos/vigilos-watermark-128.png"
@@ -973,7 +843,7 @@ if [[ -d "$BRANDING_DIR/icons/hicolor" ]]; then
     sudo mkdir -p "$ROOTFS_DIR/usr/share/icons/hicolor"
     sudo cp -r "$BRANDING_DIR/icons/hicolor/"* "$ROOTFS_DIR/usr/share/icons/hicolor/"
 fi
-# Vivid-Glassy-Dark-Icons is absent from branding/icons; Magna-Glassy-Light is the default theme
+
 copy_if_exists "$BRANDING_DIR/i3/appearance/icons/Slot-Beauty-Dark-Icons" "$ROOTFS_DIR/usr/share/icons/Slot-Beauty-Dark-Icons"
 
 echo "  - Cursor themes..."
@@ -992,7 +862,7 @@ echo "  - PurPurNight Plasma style..."
 copy_if_exists "$BRANDING_DIR/plasma-themes/PurPurNight-Plasma" "$ROOTFS_DIR/usr/share/plasma/desktoptheme/PurPurNight-Plasma"
 
 echo "  - Color scheme..."
-# Prefer explicit colour scheme assets
+
 if [[ -f "$BRANDING_DIR/colourscheme/VIGILDark.colors" ]]; then
     sudo mkdir -p "$ROOTFS_DIR/usr/share/color-schemes"
     sudo cp "$BRANDING_DIR/colourscheme/VIGILDark.colors" "$ROOTFS_DIR/usr/share/color-schemes/VIGILDark.colors"
@@ -1009,7 +879,6 @@ fi
 
 echo "  - Native Breeze decoration follows the dark palette..."
 
-
 sudo mkdir -p "$ROOTFS_DIR/usr/share/glib-2.0/schemas"
 sudo tee "$ROOTFS_DIR/usr/share/glib-2.0/schemas/90-vigilos-dark.gschema.override" >/dev/null <<'GSETTINGS_DARK'
 [org.gnome.desktop.interface]
@@ -1018,10 +887,7 @@ gtk-theme='VALYRIAN-Total-Steel'
 icon-theme='Slot-Beauty-Dark-Icons'
 GSETTINGS_DARK
 
-# ============================================
-# PRODUCT APPLICATION MENU ICONS
-# ============================================
-# Preserve upstream-owned fallback assets. Product aliases may occupy new paths.
+# Install product aliases without replacing upstream-owned icons.
 copy_product_icon() {
     local source="$1" relative="$2" owner
     if ! owner="$(sudo chroot "$ROOTFS_DIR" rpm -qf --qf '%{NAME}' "$relative" 2>/dev/null)"; then owner=""; fi
@@ -1048,8 +914,6 @@ if [[ -f "$BRANDING_DIR/start.svg" ]]; then
     done
 fi
 
-# Install product-named icons without modifying Fedora-owned upstream artwork.
-# Consumers select vigilos-logo through os-release/product theme configuration.
 if [[ -f "$BRANDING_DIR/logos/vigilos-logo.png" ]]; then
     for size in 16 22 24 32 48 64 96 128 256 512; do
         ICON_DIR="$ROOTFS_DIR/usr/share/icons/hicolor/${size}x${size}/apps"
@@ -1060,40 +924,29 @@ if [[ -f "$BRANDING_DIR/logos/vigilos-logo.png" ]]; then
     sudo install -Dm0644 "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/pixmaps/vigilos-logo.png"
 fi
 
-# ============================================
-# USER SKELETON (VIGIL DARK DEFAULTS)
-# ============================================
 echo ""
 echo "=== Applying User Skeleton Config (VIGIL Dark) ==="
 
-# Create skel with PurPurDay theme elements (NOT Global theme - avoids layout issues)
-# This applies: Plasma style, icons, cursors, colors, window decoration, splash
-# Does NOT apply: Global theme (layout), wallpaper (uses Plasma default)
-
 sudo mkdir -p "$ROOTFS_DIR/etc/skel/.config"
 
-# Copy GTK configs if available
 if [[ -d "$SKEL_DIR" ]]; then
     [[ -d "$SKEL_DIR/.config/gtk-3.0" ]] && sudo cp -r "$SKEL_DIR/.config/gtk-3.0" "$ROOTFS_DIR/etc/skel/.config/"
     [[ -d "$SKEL_DIR/.config/gtk-4.0" ]] && sudo cp -r "$SKEL_DIR/.config/gtk-4.0" "$ROOTFS_DIR/etc/skel/.config/"
     [[ -d "$SKEL_DIR/.config/environment.d" ]] && sudo cp -r "$SKEL_DIR/.config/environment.d" "$ROOTFS_DIR/etc/skel/.config/"
     if [[ -f "$SKEL_DIR/.bashrc" ]]; then
-        # Keep the signed Fedora bash-owned skeleton intact.
+
         sudo install -Dm0644 "$SKEL_DIR/.bashrc" "$ROOTFS_DIR/usr/share/vigilos/shell/bashrc"
     fi
     [[ -d "$SKEL_DIR/.local" ]] && sudo cp -r "$SKEL_DIR/.local" "$ROOTFS_DIR/etc/skel/"
 fi
 
-# Create Plasma theme configs (individual elements, not Global theme)
 echo "  - Creating VIGIL Dark Plasma configs..."
 
-# plasmarc - Plasma desktop theme
 sudo tee "$ROOTFS_DIR/etc/skel/.config/plasmarc" > /dev/null << 'PLASMARC'
 [Theme]
 name=PurPurNight-Plasma
 PLASMARC
 
-# kdeglobals - Icon theme and widget style (NO LookAndFeelPackage!)
 sudo tee "$ROOTFS_DIR/etc/skel/.config/kdeglobals" > /dev/null << 'KDEGLOBALS'
 [KDE]
 widgetStyle=breeze
@@ -1111,14 +964,12 @@ sudo install -Dm0644 "$SKEL_DIR/.config/kdeglobals" "$ROOTFS_DIR/etc/skel/.confi
 sudo install -Dm0644 "$SKEL_DIR/.config/mimeapps.list" "$ROOTFS_DIR/etc/skel/.config/mimeapps.list"
 sudo install -Dm0644 "$SKEL_DIR/.config/kcm-about-distrorc" "$ROOTFS_DIR/etc/skel/.config/kcm-about-distrorc"
 
-# kcminputrc - Cursor theme
 sudo tee "$ROOTFS_DIR/etc/skel/.config/kcminputrc" > /dev/null << 'KCMINPUT'
 [Mouse]
 cursorTheme=oreo_white_cursors
 cursorSize=24
 KCMINPUT
 
-# kwinrc - Window decoration (Aurorae)
 sudo tee "$ROOTFS_DIR/etc/skel/.config/kwinrc" > /dev/null << 'KWINRC'
 [org.kde.kdecoration2]
 library=org.kde.breeze
@@ -1134,28 +985,19 @@ LayoutName=org.kde.breeze.desktop
 LayoutName=org.kde.breeze.desktop
 KWINRC
 
-# ksplashrc - Splash screen
 sudo tee "$ROOTFS_DIR/etc/skel/.config/ksplashrc" > /dev/null << 'KSPLASH'
 [KSplash]
 Theme=VIGIL-Dark-Splash
 Engine=KSplashQML
 KSPLASH
 
-# Plasma creates activity-specific desktops on first boot. The product native
-# containment-creation hook sets aspect-fit defaults for each actual desktop.
-# Do not seed a fixed containment ID with an invalid empty activity.
 sudo rm -f "$ROOTFS_DIR/etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc" "$ROOTFS_DIR/home/liveuser/.config/plasma-org.kde.plasma.desktop-appletsrc"
 
-# A minimal product look-and-feel selects wallpaper without replacing panel layouts
-# or modifying the upstream plasma-desktop shell-defaults file.
 VIGIL_BUILD_GUEST=1 python3 "$BUILD_DIR/scripts/lib/prepare-desktop-defaults.py" "$ROOTFS_DIR" "$BRANDING_DIR"
 sudo chroot "$ROOTFS_DIR" kwriteconfig6 --file /etc/skel/.config/kdeglobals --group KDE --key LookAndFeelPackage org.vigilos.desktop
 
-# Explicit product lock-screen defaults; preserve upstream wallpaper packages.
 sudo install -m0644 "$SKEL_DIR/.config/kscreenlockerrc" "$ROOTFS_DIR/etc/skel/.config/kscreenlockerrc"
 
-
-# Copy configs to liveuser
 if [[ -d "$ROOTFS_DIR/home/liveuser" ]]; then
     echo "  - Setting up liveuser with VIGIL Dark theme..."
     sudo mkdir -p "$ROOTFS_DIR/home/liveuser/.config"
@@ -1168,14 +1010,11 @@ if [[ -d "$ROOTFS_DIR/home/liveuser" ]]; then
     sudo cp "$ROOTFS_DIR/etc/skel/.config/ksplashrc" "$ROOTFS_DIR/home/liveuser/.config/"
     sudo cp "$ROOTFS_DIR/etc/skel/.config/konsolerc" "$ROOTFS_DIR/home/liveuser/.config/" 2>/dev/null || true
 
-    # Copy GTK configs too
     [[ -d "$ROOTFS_DIR/etc/skel/.config/gtk-3.0" ]] && sudo cp -r "$ROOTFS_DIR/etc/skel/.config/gtk-3.0" "$ROOTFS_DIR/home/liveuser/.config/"
     [[ -d "$ROOTFS_DIR/etc/skel/.config/gtk-4.0" ]] && sudo cp -r "$ROOTFS_DIR/etc/skel/.config/gtk-4.0" "$ROOTFS_DIR/home/liveuser/.config/"
 
-    # Copy .dmrc for session selection
     [[ -f "$ROOTFS_DIR/etc/skel/.dmrc" ]] && sudo cp "$ROOTFS_DIR/etc/skel/.dmrc" "$ROOTFS_DIR/home/liveuser/"
 
-    # Copy Konsole profile
     sudo mkdir -p "$ROOTFS_DIR/home/liveuser/.local/share/konsole"
     [[ -f "$ROOTFS_DIR/etc/skel/.local/share/konsole/VIGILOS.profile" ]] && sudo cp "$ROOTFS_DIR/etc/skel/.local/share/konsole/VIGILOS.profile" "$ROOTFS_DIR/home/liveuser/.local/share/konsole/"
 
@@ -1184,11 +1023,8 @@ fi
 
 echo "  - Theme configs created (Plasma style, icons, cursors, decoration, splash)"
 
-# NOTE: Removed autostart layout application - it was breaking the working panel setup
-# The panel is already configured correctly via Plasma defaults + skel configs
 echo "  - Panel configured via Plasma defaults (no autostart override needed)"
 
-# Konsole profile with VIGILOS colors
 sudo mkdir -p "$ROOTFS_DIR/etc/skel/.local/share/konsole"
 sudo tee "$ROOTFS_DIR/etc/skel/.local/share/konsole/VIGILOS.profile" >/dev/null <<'KONSOLE_PROFILE'
 [Appearance]
@@ -1209,23 +1045,17 @@ Favorites=VIGILOS.profile
 DefaultProfile=VIGILOS.profile
 KONSOLE_RC
 
-# ============================================
-# SESSION AND DESKTOP HINTS
-# ============================================
 echo ""
 echo "=== Configuring Session Defaults ==="
 
-# Desktop preference
 sudo mkdir -p "$ROOTFS_DIR/etc/sysconfig"
 echo "PREFERRED=plasma" | sudo tee "$ROOTFS_DIR/etc/sysconfig/desktop" >/dev/null 2>&1
 
-# Create .dmrc for skel (new users get this)
 sudo tee "$ROOTFS_DIR/etc/skel/.dmrc" >/dev/null <<'DMRC'
 [Desktop]
 Session=plasma
 DMRC
 
-# AccountsService for liveuser
 sudo mkdir -p "$ROOTFS_DIR/var/lib/AccountsService/users"
 sudo tee "$ROOTFS_DIR/var/lib/AccountsService/users/liveuser" >/dev/null <<'ACCT'
 [User]
@@ -1235,30 +1065,25 @@ Icon=/usr/share/pixmaps/vigilos-logo.png
 SystemAccount=false
 ACCT
 
-# AGGRESSIVELY remove/disable GNOME sessions to prevent installer from selecting them
 echo "  - Removing GNOME session files..."
 for gnome_session in gnome gnome-xorg gnome-classic gnome-classic-xorg gnome-wayland; do
-    # Remove X sessions
+
     sudo rm -f "$ROOTFS_DIR/usr/share/xsessions/${gnome_session}.desktop" 2>/dev/null || true
-    # Remove Wayland sessions
+
     sudo rm -f "$ROOTFS_DIR/usr/share/wayland-sessions/${gnome_session}.desktop" 2>/dev/null || true
 done
 
-# Also remove any remaining GNOME session files
 sudo rm -f "$ROOTFS_DIR/usr/share/xsessions/gnome"*.desktop 2>/dev/null || true
 sudo rm -f "$ROOTFS_DIR/usr/share/wayland-sessions/gnome"*.desktop 2>/dev/null || true
 
-# Disable GNOME initial setup and tour
 sudo rm -f "$ROOTFS_DIR/etc/xdg/autostart/gnome-initial-setup-first-login.desktop" 2>/dev/null || true
 sudo rm -f "$ROOTFS_DIR/etc/xdg/autostart/gnome-welcome-tour.desktop" 2>/dev/null || true
 sudo rm -f "$ROOTFS_DIR/etc/xdg/autostart/org.gnome.Tour.desktop" 2>/dev/null || true
 
-# Set system-wide default session via XDG
 echo "  - Setting system-wide default session to Plasma..."
 sudo mkdir -p "$ROOTFS_DIR/etc/X11/xinit/Xsession.d"
 echo "PREFERRED=plasma" | sudo tee "$ROOTFS_DIR/etc/X11/xinit/Xsession.d/50-default-session" >/dev/null
 
-# Create AccountsService defaults for new users
 sudo mkdir -p "$ROOTFS_DIR/etc/accountsservice/user-templates"
 sudo tee "$ROOTFS_DIR/etc/accountsservice/user-templates/standard" >/dev/null <<'ACCT_TEMPLATE'
 [User]
@@ -1267,7 +1092,6 @@ XSession=plasma
 SystemAccount=false
 ACCT_TEMPLATE
 
-# Also create a default user template
 sudo tee "$ROOTFS_DIR/var/lib/AccountsService/users/default" >/dev/null <<'ACCT_DEFAULT'
 [User]
 Session=plasma
@@ -1275,9 +1099,6 @@ XSession=plasma
 SystemAccount=false
 ACCT_DEFAULT
 
-# ============================================
-# INSTALLER SHORTCUT
-# ============================================
 echo ""
 echo "=== Creating Installer Shortcut ==="
 
@@ -1294,8 +1115,6 @@ StartupNotify=true
 StartupWMClass=liveinst
 INSTALLER_EOF
 
-# Hide the upstream application-menu entry through an XDG override; preserve
-# the upstream-owned file and use our separate product desktop ID.
 sudo mkdir -p "$ROOTFS_DIR/usr/local/share/applications"
 sudo tee "$ROOTFS_DIR/usr/local/share/applications/liveinst.desktop" >/dev/null <<'HIDE_UPSTREAM_INSTALLER'
 [Desktop Entry]
@@ -1303,7 +1122,6 @@ Type=Application
 Hidden=true
 HIDE_UPSTREAM_INSTALLER
 
-# Add to desktop for live user
 sudo mkdir -p "$ROOTFS_DIR/etc/skel/Desktop"
 sudo cp "$ROOTFS_DIR/usr/share/applications/vigilos-installer.desktop" "$ROOTFS_DIR/etc/skel/Desktop/"
 sudo chmod +x "$ROOTFS_DIR/etc/skel/Desktop/vigilos-installer.desktop"
@@ -1313,32 +1131,11 @@ if [[ -d "$ROOTFS_DIR/home/liveuser/Desktop" ]]; then
     sudo chmod +x "$ROOTFS_DIR/home/liveuser/Desktop/vigilos-installer.desktop"
 fi
 
-# ============================================
-# OS RELEASE BRANDING
-# ============================================
 echo ""
 echo "=== Applying OS Branding ==="
 
-# Use the immutable per-run allocation for OS identity, banners, installer stamp
-# and the copied live/installed GRUB themes. Fedora package-base identity stays44.
 sudo env VIGIL_BUILD_GUEST=1 VIGIL_DESKTOP="$DESKTOP" python3 "$BUILD_DIR/scripts/lib/prepare-release.py" "$ROOTFS_DIR"
 
-# ============================================
-# ANACONDA INSTALLER PROFILE  (bootloader-install fix)
-# ============================================
-# Fedora 44's Anaconda picks its profile (/etc/anaconda/profile.d/*.conf) by
-# matching the live env's os-release ID/VARIANT_ID. Because we rebrand ID=vigilos
-# above, NO stock profile matches, so Anaconda falls back to built-in defaults
-# where [Bootloader] efi_dir = "default". At the bootloader step it then runs
-#   gen_grub_cfgstub /boot/grub2 /boot/efi/EFI/default
-# but shim/grub2-efi installed to /boot/efi/EFI/fedora, so EFI/default does not
-# exist and the script fails ->
-#   org.fedoraproject.Anaconda.BootloaderInstallationError: gen_grub_cfgstub script failed
-# (the exact install crash we hit on the RTX 4080 box, 2026-05-31).
-#
-# Ship an vigilos profile that inherits the fedora profile. Inheritance pulls in
-# efi_dir=fedora (and Fedora's storage/bootloader defaults), and [Profile Detection]
-# os_id=vigilos makes Anaconda auto-select it from our rebranded os-release.
 sudo mkdir -p "$ROOTFS_DIR/etc/anaconda/profile.d"
 sudo tee "$ROOTFS_DIR/etc/anaconda/profile.d/vigilos.conf" > /dev/null << 'EOF'
 # VIGILOS Anaconda profile — inherits Fedora so the installed system's GRUB
@@ -1356,7 +1153,6 @@ webui_web_engine = /usr/local/libexec/vigilos-anaconda-browser
 custom_stylesheet = /usr/share/vigilos/anaconda/vigilos.css
 EOF
 
-# /.buildstamp was rendered from the same allocated release above.
 sudo mkdir -p "$ROOTFS_DIR/usr/share/vigilos/anaconda"
 sudo tee "$ROOTFS_DIR/usr/share/vigilos/anaconda/vigilos.css" >/dev/null <<'INSTALLER_CSS'
 /* VIGIL OS product styling; upstream Anaconda notices remain intact. */
@@ -1366,12 +1162,10 @@ sudo tee "$ROOTFS_DIR/usr/share/vigilos/anaconda/vigilos.css" >/dev/null <<'INST
 AnacondaSpokeWindow #nav-box { background-image: none; background-color: #1763ef; color: white; }
 INSTALLER_CSS
 
-# WebUI uses Cockpit's product branding selected by os-release ID.
-# Keep the upstream HTML/JavaScript and its legal notices unchanged.
 sudo mkdir -p "$ROOTFS_DIR/usr/share/cockpit/branding/vigilos"
 sudo cp "$BRANDING_DIR/logos/vigilos-logo.png" "$ROOTFS_DIR/usr/share/cockpit/branding/vigilos/logo.png"
 sudo cp "$BRANDING_DIR/logos/vigilos-logo-full.png" "$ROOTFS_DIR/usr/share/cockpit/branding/vigilos/brand-large.png"
-# Cockpit falls back to the upstream favicon unless product branding supplies one.
+
 sudo install -m0644 "$BRANDING_DIR/logos/vigilos-icon-16.png" "$ROOTFS_DIR/usr/share/cockpit/branding/vigilos/favicon.ico"
 sudo tee "$ROOTFS_DIR/usr/share/cockpit/branding/vigilos/branding.css" >/dev/null <<'COCKPIT_CSS'
 /* VIGIL OS product styling. Upstream Cockpit/Anaconda licenses are retained. */
@@ -1385,27 +1179,20 @@ sudo tee "$ROOTFS_DIR/usr/share/cockpit/branding/vigilos/branding.css" >/dev/nul
 .pf-v6-theme-dark .anaconda { --pf-t--global--color--brand--default: var(--brand-default-light); --pf-t--global--color--brand--hover: var(--brand-default); }
 COCKPIT_CSS
 
-# Set dnf releasever for Fedora 44 repos
 sudo mkdir -p "$ROOTFS_DIR/etc/dnf/vars"
 echo "44" | sudo tee "$ROOTFS_DIR/etc/dnf/vars/releasever" > /dev/null
 
-# Default hostname (installed system should not keep localhost-live)
 echo "localhost" | sudo tee "$ROOTFS_DIR/etc/hostname" >/dev/null
 
-# ============================================
-# SELINUX MODE
-# ============================================
 echo ""
 echo "=== Configuring SELinux ==="
-# Keep the Fedora security default; label changed files in the build instead
-# of scheduling a whole-system relabel at the user's second boot.
+
 if [[ -f "$ROOTFS_DIR/etc/selinux/config" ]]; then
     sudo sed -i 's/^SELINUX=.*/SELINUX=enforcing/' "$ROOTFS_DIR/etc/selinux/config"
     sudo sed -i 's/^SELINUXTYPE=.*/SELINUXTYPE=targeted/' "$ROOTFS_DIR/etc/selinux/config"
 fi
 sudo rm -f "$ROOTFS_DIR/.autorelabel"
 
-# Pre-label key branding paths to minimize live issues
 echo "  - Restoring SELinux contexts on branding files..."
 if [[ -x "$ROOTFS_DIR/usr/sbin/restorecon" ]]; then
     sudo chroot "$ROOTFS_DIR" restorecon -R /usr/share/plymouth 2>/dev/null || true
@@ -1421,19 +1208,14 @@ if [[ -x "$ROOTFS_DIR/usr/sbin/restorecon" ]]; then
     sudo chroot "$ROOTFS_DIR" restorecon -RF /home/liveuser /usr/local /usr/share/vigilos /var/lib/vigilos 2>/dev/null || true
 fi
 
-
-# Configure the installed boot presentation before the very first reboot.
 sudo install -m0755 "$BUILD_DIR/scripts/runtime/vigilos-configure-installed-boot" "$ROOTFS_DIR/usr/local/libexec/vigilos-configure-installed-boot"
 sudo mkdir -p "$ROOTFS_DIR/usr/share/vigilos/anaconda"
 sudo cp "$BUILD_DIR/kickstarts/vigilos-post.ks" "$ROOTFS_DIR/usr/share/vigilos/anaconda/"
-# Fedora44 loads interactive defaults before distributing kickstart to D-Bus.
-# The later post-scripts append is not propagated to the new runtime module.
+
 if ! grep -q '^%include /usr/share/vigilos/anaconda/vigilos-post.ks$' "$ROOTFS_DIR/usr/share/anaconda/interactive-defaults.ks"; then
     printf '\n%%include /usr/share/vigilos/anaconda/vigilos-post.ks\n' | sudo tee -a "$ROOTFS_DIR/usr/share/anaconda/interactive-defaults.ks" >/dev/null
 fi
 
-# Replace Fedora's optional Welcome Center customization package via our RPM.
-# Keep the KDE onboarding content and avoid exposing untested third-party toggles.
 sudo mkdir -p "$ROOTFS_DIR/usr/share/plasma/plasma-welcome"
 sudo cp "$BRANDING_DIR/plasma-welcome/intro-customization.desktop" "$ROOTFS_DIR/usr/share/plasma/plasma-welcome/"
 sudo mkdir -p "$ROOTFS_DIR/etc/skel/.config/autostart" "$ROOTFS_DIR/home/liveuser/.config/autostart"
@@ -1441,8 +1223,6 @@ sudo cp "$SKEL_DIR/.config/autostart/imsettings-start.desktop" "$ROOTFS_DIR/etc/
 sudo cp "$SKEL_DIR/.config/autostart/imsettings-start.desktop" "$ROOTFS_DIR/home/liveuser/.config/autostart/"
 sudo chroot "$ROOTFS_DIR" chown -R liveuser:liveuser /home/liveuser/.config/autostart
 
-# Read-only source media can expose copied directories as0555. User defaults
-# must remain writable by their eventual owner, including inherited subdirs.
 sudo chmod -R u+rwX "$ROOTFS_DIR/etc/skel"
 if [[ -d "$ROOTFS_DIR/home/liveuser" ]]; then
     sudo chmod -R u+rwX "$ROOTFS_DIR/home/liveuser"
@@ -1454,9 +1234,6 @@ fi
 printf "%s\n" "$DESKTOP" | sudo tee "$ROOTFS_DIR/etc/vigilos-desktop" >/dev/null
 sudo env VIGIL_BUILD_GUEST=1 VIGIL_DESKTOP="$DESKTOP" bash "$BUILD_DIR/scripts/lib/package-branding.sh" "$ROOTFS_DIR" "$WORK_DIR"
 
-# ============================================
-# UPDATE ICON CACHES
-# ============================================
 echo ""
 echo "=== Updating Icon Caches ==="
 if [[ -x "$ROOTFS_DIR/usr/bin/gtk-update-icon-cache" ]]; then
@@ -1469,9 +1246,6 @@ if [[ -x "$ROOTFS_DIR/usr/bin/kbuildsycoca6" ]]; then
     sudo chroot "$ROOTFS_DIR" kbuildsycoca6 --noincremental 2>/dev/null || true
 fi
 
-# ============================================
-# MODIFY INITRD FOR BOOT SPLASH
-# ============================================
 echo ""
 echo "=== Modifying initrd for boot splash ==="
 
@@ -1482,20 +1256,15 @@ done
 [[ -n "$INITRD_PATH" ]] || { echo 'ERROR: Live initramfs path not found.' >&2; exit 1; }
 KERNEL_VERSION="$(sudo find "$ROOTFS_DIR/usr/lib/modules" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -V | tail -1)"
 [[ -n "$KERNEL_VERSION" ]] || { echo 'ERROR: Live kernel modules missing.' >&2; exit 1; }
-# An updated root must boot its matching kernel, not the original ISO kernel.
+
 LIVE_KERNEL="$ROOTFS_DIR/boot/vmlinuz-$KERNEL_VERSION"
 [[ -f "$LIVE_KERNEL" ]] || { echo "ERROR: Matching kernel missing: $KERNEL_VERSION" >&2; exit 1; }
 sudo cp "$LIVE_KERNEL" "$WORK_DIR/new_iso/boot/x86_64/loader/linux"
-# Rebuild with dracut instead of assuming a single xz cpio archive. Keep generic
-# hardware support and omit the unused livenet hook that caused the recorded pause.
+
 sudo chroot "$ROOTFS_DIR" dracut --force --no-hostonly --no-hostonly-cmdline --compress "zstd -3 -q -T1" --add 'dmsquash-live plymouth' --omit livenet /tmp/vigil-live-initrd.img "$KERNEL_VERSION"
 sudo cp "$ROOTFS_DIR/tmp/vigil-live-initrd.img" "$INITRD_PATH"
 sudo rm -f "$ROOTFS_DIR/tmp/vigil-live-initrd.img"
 
-
-# ============================================
-# UNMOUNT BIND MOUNTS (chroot operations done)
-# ============================================
 echo ""
 echo "Restoring portable image state..."
 sudo chroot "$ROOTFS_DIR" dnf clean all
@@ -1513,21 +1282,16 @@ sudo umount -l "$ROOTFS_DIR/proc" 2>/dev/null || true
 sudo umount -l "$ROOTFS_DIR/dev" 2>/dev/null || true
 sleep 1
 
-# Verify mounts released
 if mountpoint -q "$ROOTFS_DIR/dev"; then
     echo 'ERROR: A chroot bind mount remains active; preserving work directory.' >&2
     exit 1
 fi
 
-# The current verified Fedora KDE pipeline uses a flat EROFS root. Keep its
-# finalization in one reusable, guarded stage so a packaging failure can be
-# retried without repeating a successful base update or changing old outputs.
 if [[ "$ROOT_IMAGE_FORMAT" != *EROFS* || "$MOUNTED_ROOTFS" == true ]]; then
     echo 'ERROR: This verified pipeline requires the official Fedora 44 KDE EROFS base.' >&2
     exit 1
 fi
-# Preserve the BIOS core image, and supply its optional graphical modules from
-# the same signed Fedora GRUB package already present in the prepared target.
+
 if [[ -d "$ROOTFS_DIR/usr/lib/grub/i386-pc" ]]; then
     sudo mkdir -p "$WORK_DIR/new_iso/boot/grub2/i386-pc"
     for module in "$ROOTFS_DIR/usr/lib/grub/i386-pc/"*.mod "$ROOTFS_DIR/usr/lib/grub/i386-pc/"*.lst; do

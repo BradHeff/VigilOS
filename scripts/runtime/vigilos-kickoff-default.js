@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Theme default for newly created launchers; preserve an explicitly chosen icon.
 var vigilPreviousGroup = applet.currentConfigGroup;
 applet.currentConfigGroup = ["General"];
 var vigilIcon = applet.readConfig("icon");

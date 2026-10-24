@@ -12,6 +12,7 @@ from version import source_release
 
 
 def prepare_release(root, release, desktop):
+    """Render the allocated identity into the prepared product root."""
     if desktop not in ('kde', 'i3'):
         raise ValueError('Unknown desktop')
     root = Path(root)
@@ -62,7 +63,7 @@ DISTRIB_DEVELOPER="Brad Heffernan"
     if not cfg.has_section('Main'): cfg.add_section('Main')
     cfg['Main'].update(Product='VIGIL OS', Version=version, IsFinal='False')
     with (root / '.buildstamp').open('w') as stream: cfg.write(stream)
-    # Render only product-owned copies; never change source artwork/upstream APIs.
+
     for base in [root, root.parent / 'new_iso']:
         for folder in ['boot/grub2/themes/vigilos', 'usr/share/grub/themes/vigilos', 'EFI/BOOT/themes/vigilos']:
             path = base / folder / 'theme.txt'
