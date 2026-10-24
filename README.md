@@ -50,8 +50,6 @@ SIERRA desktop integration is planned, with a Plasma search field, an i3 Rofi pr
 
 [VpM](VPM.md) describes a proposed native package format and package manager. It has no implementation in this checkout. RPM and DNF5 remain responsible for the system.
 
-[AI.md](AI.md) contains the build architecture, development rules, validation references and detailed future plans.
-
 ## Licence
 
 VIGIL-owned original material is available under the [VIGIL Personal Build Licence](LICENSE). It permits cloning and building an unmodified copy for personal use, with the documented build and version settings. It requires the branding to remain intact and prohibits commercial redistribution, modification and reuse of covered material in other projects.
