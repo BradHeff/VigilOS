@@ -1,10 +1,10 @@
 # VIGIL OS
 
-VIGIL OS is a Fedora 44 based Linux distribution created by Brad Heffernan. It has two editions: KDE Plasma on Wayland and i3 on X11. Both use the same dark wallpaper and VIGIL branding across the boot screen, login, desktop and installer.
+VIGIL OS is a Linux distribution based on Fedora 44, created by Brad Heffernan. It comes in two editions: KDE Plasma on Wayland, and i3 on X11. Both share the same dark wallpaper and VIGIL branding on the boot screen, the login screen, the desktop and the installer.
 
-The KDE edition includes SDDM, Dolphin, Konsole, Kate and Discover. The i3 edition includes LightDM, Polybar, Rofi, i3lock-color, Greenclip, Alacritty and Thunar. Both include Brave as the default browser, LibreOffice, Node.js, npm, Python and Flatpak. System updates use RPM and DNF5 with signed Fedora and Brave repositories.
+The KDE edition includes SDDM, Dolphin, Konsole, Kate and Discover. The i3 edition includes LightDM, Polybar, Rofi, i3lock-color, Greenclip, Alacritty and Thunar. Both come with Brave as the default browser, LibreOffice, Node.js, npm, Python and Flatpak. System updates come from the signed Fedora and Brave repositories through RPM and DNF5.
 
-This is a development project. Earlier 1.2 images passed BIOS and UEFI live boot, fresh UEFI installation, installed login and reboot, updates, lock authentication and display checks in virtual machines. Physical hardware and Secure Boot have not been qualified. Later source checks do not replace testing a newly built ISO.
+VIGIL OS is still in development. The 1.2 images passed these tests in virtual machines: live boot with BIOS and UEFI, a fresh UEFI install, logging in to and rebooting the installed system, updates, unlocking the lock screen, and display checks. They have not been tested on physical hardware or with Secure Boot. Passing the source checks doesn't mean a new ISO works; each new build still needs testing.
 
 ## Screenshots
 
@@ -22,15 +22,15 @@ This is a development project. Earlier 1.2 images passed BIOS and UEFI live boot
 | --- | --- |
 | ![VIGIL OS i3 desktop with Polybar](images/i3-desktop.png) | ![VIGIL OS i3 LightDM login screen](images/i3-login.png) |
 
-## Build the ISO
+## Building the ISO
 
-The host needs Bash, Python 3, curl, gpgv, OpenSSH client tools, xorriso, QEMU, qemu-img and working KVM access. Run the script as your normal user from the repository directory:
+You need Bash, Python 3, curl, gpgv, the OpenSSH client tools, xorriso, QEMU with qemu-img, and working KVM access. Run the build as your normal user from the repository directory:
 
 ```bash
 bash scripts/build-and-brand.sh
 ```
 
-The default builds both editions in sequence. To build one edition or check the source and prerequisites first:
+That builds both editions, one after the other. To build one edition, or to check the source and host tools without building anything:
 
 ```bash
 bash scripts/build-and-brand.sh --desktop kde
@@ -38,17 +38,31 @@ bash scripts/build-and-brand.sh --desktop i3
 bash scripts/build-and-brand.sh --check
 ```
 
-The script verifies the Fedora inputs and builds each edition in a fresh disposable VM with 6 GiB of RAM and four CPUs. Package installation, mounts and image preparation run inside that VM. Missing host dependencies are reported for you to install separately.
+The script checks the Fedora downloads against Fedora's signed checksums, then builds each edition in a fresh throwaway VM with 6 GiB of RAM and four CPUs. Installing packages, mounting images and preparing the image all happen inside that VM. If a host tool is missing, the script names it and stops; it never installs anything on your machine.
 
-ISOs, SHA256 checksum files and build evidence are saved under `.build/output/<timestamp>/`. Existing outputs are preserved. Build logs and private temporary VM files stay in `.build/`; do not publish that directory. Workspace, cache and output options are listed by `bash scripts/build-and-brand.sh --help`.
+Finished ISOs, their SHA256 checksums and the build evidence go in `.build/output/<timestamp>/`, and earlier builds are never overwritten. Logs and the temporary VM files stay in `.build/`, which must not be published. `bash scripts/build-and-brand.sh --help` lists the options for the workspace, cache and output folders.
 
-Product versions use `build_number.version_number`. The first number and codename are changed manually in `version.json` for a larger release. Each real build advances the second number once; both editions built together share it. The sequence goes from `1.9` to `1.10`. Checks do not advance it, and deleting `.build` does not reset it. A failed build after version reservation still consumes its number.
+Version numbers have the form `build_number.version_number`. For a bigger release you change the first number and the codename by hand in `version.json`. Each real build adds one to the second number, both editions built together get the same number, and `1.9` is followed by `1.10`. Checks don't change it, and neither does deleting `.build`. A build that fails after taking a number still uses that number up.
+
+## VpM, the VIGIL OS package manager
+
+VpM is the package manager being written for VIGIL OS. It is developed in its own repository, which isn't public yet, and the ISO doesn't include it. VpM packages install under `/opt/vpm`, next to RPM, and RPM and DNF5 stay in charge of the rest of the system.
+
+VpM can already build, sign and verify packages, and install and remove them with SELinux labels and sandboxed install scripts. So far it has changed a running system only inside test VMs. On a real system it stays switched off until an administrator turns it on.
+
+To test a VpM checkout in a throwaway VM:
+
+```bash
+bash scripts/test-vpm.sh                 # VpM checkout in ../VpM
+bash scripts/test-vpm.sh --vpm DIR       # a checkout somewhere else
+bash scripts/test-vpm.sh --points ''     # skip the power-cut tests
+```
+
+The script boots the same verified Fedora 44 Cloud image the builds use, and builds VpM and its test packages on this machine. It then runs VpM's system tests as root inside the VM, with SELinux enforcing. For each power-cut test it pauses an install or removal, kills the VM, boots it again and checks that VpM recovers. Nothing is installed on this machine, and the results go in `.build/vpm-test/`.
 
 ## Future plans
 
-SIERRA desktop integration is planned, with a Plasma search field, an i3 Rofi prompt and a shared task window. The initial work would cover conversation, selected files and a small set of tested application actions with explicit permissions. General GUI automation would remain experimental. SIERRA integration is not implemented in this checkout.
-
-[VpM](VPM.md) describes a proposed native package format and package manager. It has no implementation in this checkout. RPM and DNF5 remain responsible for the system.
+SIERRA desktop integration is planned: a search field in Plasma, a Rofi prompt in i3, and a task window shared by both. The first version would handle conversation, selected files and a few tested application actions, each with explicit permission. General GUI automation would stay experimental. None of this is implemented yet.
 
 ## Licence
 

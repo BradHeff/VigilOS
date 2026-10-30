@@ -18,8 +18,7 @@ def main():
     runtime = Path(os.environ['XDG_RUNTIME_DIR'])
     if not runtime.is_dir() or runtime.stat().st_uid != os.geteuid():
         raise SystemExit('Owned desktop runtime directory required')
-    # Resolve the native executable from the official RPM launcher location. Its
-    # shell wrapper masks failures and can orphan its child when Anaconda exits.
+    # Run Brave's binary directly; its wrapper can orphan it when Anaconda exits.
     wrapper = Path('/usr/bin/brave-browser').resolve(strict=True)
     binary = wrapper.parent / 'brave'
     if not binary.is_file() or not os.access(binary, os.X_OK):
@@ -37,8 +36,7 @@ def main():
     for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         signal.signal(signum, stop)
     try:
-        # No normal user profile, wallet or policy is changed. This private
-        # runtime-only installer profile never saves credentials or analytics.
+        # A throwaway profile that saves no credentials or analytics.
         (profile / 'Local State').write_text(json.dumps({
             'brave': {'p3a': {'enabled': False, 'notice_acknowledged': True}}
         }))
@@ -57,8 +55,7 @@ def main():
             ('--ozone-platform=wayland' if os.environ.get('WAYLAND_DISPLAY') else '--ozone-platform=x11'), f'--app={sys.argv[1]}'
         ], env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, close_fds=True, bufsize=0)
-        # Only fresh pipes are inherited by sandboxed browser children. Preserve
-        # useful diagnostics without exposing the launcher's original terminal.
+        # Relay output through a fresh pipe, not the launcher's terminal.
         def relay():
             while data := child.stdout.read(4096):
                 try:

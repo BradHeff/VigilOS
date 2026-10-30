@@ -35,13 +35,14 @@ def download(url, target):
     run(['curl','--disable','--proto','=https','--proto-redir','=https','--fail','--location','--retry','4','--connect-timeout','30','--output',partial,url])
     partial.replace(target)
 
-def verify_inputs(cache, work):
+def verify_inputs(cache, work, kinds=tuple(INPUTS)):
     """Verify pinned Fedora downloads against signed checksums."""
     cache.mkdir(parents=True,exist_ok=True)
     download('https://fedoraproject.org/fedora.gpg',cache/'fedora.gpg')
     keyhome=work/'keyring'; keyhome.mkdir(mode=0o700)
     paths={}
-    for kind,(directory,name,checksums,expected) in INPUTS.items():
+    for kind in kinds:
+        directory,name,checksums,expected=INPUTS[kind]
         base=f'https://download.fedoraproject.org/pub/fedora/linux/releases/44/{directory}'
         download(f'{base}/{name}',cache/name)
         download(f'{base}/{checksums}',cache/checksums)
@@ -240,7 +241,7 @@ def build_locked_workspace(args, release_lock):
         for desktop in (['kde','i3'] if args.desktop=='both' else [args.desktop]):
             build_edition(desktop,inputs,args,parent)
     except BaseException as exc:
-        result.update(status='failed',error=str(exc),version_reused=False)
+        result.update(status='failed',error=str(exc),version_consumed=True)
         (parent/'RUN.json').write_text(json.dumps(result,indent=2)+'\n')
         raise
     result.update(status='complete')
