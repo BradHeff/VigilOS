@@ -1,0 +1,14 @@
+{
+  "KPlugin": {
+    "Authors": [
+      {
+        "Name": "byrotek",
+        "Website": "https://www.deviantart.com/byrotek"
+      }
+    ],
+    "Id": "VIGILOS-Desktop",
+    "Name": "VIGIL OS Landscape",
+    "Description": "Painting by byrotek, used with the artist's permission. https://www.deviantart.com/byrotek"
+  },
+  "X-KDE-PlasmaImageWallpaper-AccentColor": "#719bff"
+}

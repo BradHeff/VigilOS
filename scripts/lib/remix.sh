@@ -803,7 +803,8 @@ sudo mkdir -p "$ROOTFS_DIR/etc/sddm.conf.d"
 sudo tee "$ROOTFS_DIR/etc/sddm.conf.d/vigilos.conf" >/dev/null <<'SDDMEOF'
 [Theme]
 Current=vigilos
-CursorTheme=oreo_white_cursors
+CursorTheme=Qogir-white-cursors
+CursorSize=24
 
 [General]
 DisplayServer=wayland
@@ -821,10 +822,11 @@ echo "=== Applying VIGIL Dark Plasma Defaults ==="
 
 echo "  - Wallpapers..."
 
-if [[ -d "$BRANDING_DIR/wallpapers/VIGILOS" ]]; then
-    sudo mkdir -p "$ROOTFS_DIR/usr/share/vigilos/wallpapers/VIGILOS"
-    sudo cp -r "$BRANDING_DIR/wallpapers/VIGILOS/"* "$ROOTFS_DIR/usr/share/vigilos/wallpapers/VIGILOS/"
-fi
+# VIGILOS is the dark artwork for login and lock screens; VIGILOS-Desktop is the desktop.
+for wallpaper in VIGILOS VIGILOS-Desktop; do
+    sudo mkdir -p "$ROOTFS_DIR/usr/share/vigilos/wallpapers/$wallpaper"
+    sudo cp -r "$BRANDING_DIR/wallpapers/$wallpaper/"* "$ROOTFS_DIR/usr/share/vigilos/wallpapers/$wallpaper/"
+done
 
 echo "  - Logos..."
 copy_if_exists "$BRANDING_DIR/logos" "$ROOTFS_DIR/usr/share/vigilos/logos"
@@ -847,6 +849,8 @@ fi
 copy_if_exists "$BRANDING_DIR/i3/appearance/icons/Slot-Beauty-Dark-Icons" "$ROOTFS_DIR/usr/share/icons/Slot-Beauty-Dark-Icons"
 
 echo "  - Cursor themes..."
+copy_if_exists "$BRANDING_DIR/cursors/Qogir-white-cursors" "$ROOTFS_DIR/usr/share/icons/Qogir-white-cursors"
+copy_if_exists "$BRANDING_DIR/cursors/Qogir-cursors" "$ROOTFS_DIR/usr/share/icons/Qogir-cursors"
 copy_if_exists "$BRANDING_DIR/cursors/oreo_white_cursors" "$ROOTFS_DIR/usr/share/icons/oreo_white_cursors"
 copy_if_exists "$BRANDING_DIR/cursors/Bibata-Modern-Ice-Regular-Windows" "$ROOTFS_DIR/usr/share/icons/Bibata-Modern-Ice-Regular-Windows"
 copy_if_exists "$BRANDING_DIR/cursors/Bibata-Modern-Ice-Large-Windows" "$ROOTFS_DIR/usr/share/icons/Bibata-Modern-Ice-Large-Windows"
@@ -872,8 +876,9 @@ elif [[ -f "$BRANDING_DIR/plasma-themes/PurPurDay-Plasma/colors" ]]; then
 fi
 
 echo "  - Konsole color scheme..."
+sudo mkdir -p "$ROOTFS_DIR/usr/share/konsole"
+sudo install -m0644 "$BRANDING_DIR/colourscheme/VIGILDark-Konsole.colorscheme" "$ROOTFS_DIR/usr/share/konsole/VIGILDark-Konsole.colorscheme"
 if [[ -f "$BRANDING_DIR/colourscheme/PurPurDayBlur-Konsole.colorscheme" ]]; then
-    sudo mkdir -p "$ROOTFS_DIR/usr/share/konsole"
     sudo cp "$BRANDING_DIR/colourscheme/PurPurDayBlur-Konsole.colorscheme" "$ROOTFS_DIR/usr/share/konsole/PurPurDayBlur-Konsole.colorscheme"
 fi
 
@@ -966,7 +971,7 @@ sudo install -Dm0644 "$SKEL_DIR/.config/kcm-about-distrorc" "$ROOTFS_DIR/etc/ske
 
 sudo tee "$ROOTFS_DIR/etc/skel/.config/kcminputrc" > /dev/null << 'KCMINPUT'
 [Mouse]
-cursorTheme=oreo_white_cursors
+cursorTheme=Qogir-white-cursors
 cursorSize=24
 KCMINPUT
 
@@ -1028,7 +1033,7 @@ echo "  - Panel configured via Plasma defaults (no autostart override needed)"
 sudo mkdir -p "$ROOTFS_DIR/etc/skel/.local/share/konsole"
 sudo tee "$ROOTFS_DIR/etc/skel/.local/share/konsole/VIGILOS.profile" >/dev/null <<'KONSOLE_PROFILE'
 [Appearance]
-ColorScheme=PurPurDayBlur-Konsole
+ColorScheme=VIGILDark-Konsole
 Opacity=1
 
 [General]
@@ -1232,6 +1237,7 @@ if [[ "$DESKTOP" == i3 ]]; then
     sudo env VIGIL_BUILD_GUEST=1 bash "$BUILD_DIR/scripts/lib/install-i3.sh" "$ROOTFS_DIR" "$WORK_DIR"
 fi
 printf "%s\n" "$DESKTOP" | sudo tee "$ROOTFS_DIR/etc/vigilos-desktop" >/dev/null
+sudo env VIGIL_BUILD_GUEST=1 bash "$BUILD_DIR/scripts/lib/package-vpm.sh" "$ROOTFS_DIR" "$WORK_DIR"
 sudo env VIGIL_BUILD_GUEST=1 VIGIL_DESKTOP="$DESKTOP" bash "$BUILD_DIR/scripts/lib/package-branding.sh" "$ROOTFS_DIR" "$WORK_DIR"
 
 echo ""

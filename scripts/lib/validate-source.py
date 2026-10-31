@@ -32,6 +32,29 @@ for name,info in manifest['variants'].items():
         assert hashlib.sha256(data).hexdigest()==info['sha256'],path
         assert struct.unpack('>II',data[16:24])==(info['width'],info['height']),path
 assert not (wallpaper.parent/'1672x941.png').exists(),'Old city must not remain an active wallpaper choice'
+def jpeg_size(data):
+    i=2
+    while data[i]==0xFF:
+        marker,length=data[i+1],struct.unpack('>H',data[i+2:i+4])[0]
+        if 0xC0<=marker<=0xCF and marker not in (0xC4,0xC8,0xCC):
+            height,width=struct.unpack('>HH',data[i+5:i+9]);return width,height
+        i+=2+length
+    raise ValueError('no JPEG frame header')
+desktop=json.loads((root/'branding/wallpapers/desktop-assets.json').read_text())
+assert hashlib.sha256((root/'branding/wallpapers/wallpaper.png').read_bytes()).hexdigest()==desktop['source']['sha256']
+images=root/'branding/wallpapers/VIGILOS-Desktop/contents/images'
+assert sorted(p.name for p in images.iterdir())==sorted(desktop['variants'])
+for name,info in desktop['variants'].items():
+    data=(images/name).read_bytes()
+    assert hashlib.sha256(data).hexdigest()==info['sha256'],name
+    assert jpeg_size(data)==(info['width'],info['height'])and name==f"{info['width']}x{info['height']}.jpg",name
+assert 'wallpapers/VIGILOS-Desktop' in (root/'scripts/lib/package-wallpaper-compat.sh').read_text()
+credit='https://www.deviantart.com/byrotek'
+assert credit in (root/'LICENSES/NOTICE.txt').read_text() and credit in (root/'README.md').read_text(),'Keep the wallpaper artist credit'
+assert json.loads((images.parent.parent/'metadata.json').read_text())['KPlugin']['Authors'][0]['Website']==credit
+login_art='/usr/share/vigilos/wallpapers/VIGILOS/contents/images/3840x2160.png'
+for path in ['Skel/.config/kscreenlockerrc','branding/i3/bin/lock','scripts/lib/install-i3.sh']:
+    assert login_art in (root/path).read_text(),f'{path} must keep the dark artwork'
 for folder in ['PLASMA-CONFIGS/VIGILOS-SDDM','branding/sddm/vigilos']:
     assert hashlib.sha256((root/folder/'background.png').read_bytes()).hexdigest()==manifest['preserved_sddm']['sha256']
     cfg=configparser.ConfigParser();cfg.read(root/folder/'theme.conf');colors=cfg['General']
@@ -52,7 +75,18 @@ for profile in ['Skel','branding/i3/skel']:
     for version in ['3','4']:
         cfg=configparser.ConfigParser();cfg.read(root/profile/f'.config/gtk-{version}.0/settings.ini')
         assert cfg.getboolean('Settings','gtk-application-prefer-dark-theme')
-print('PASS: pinned vendor inputs, preserved user dark artwork, aspect-safe defaults and login contrast')
+cursor='Qogir-white-cursors'
+for path,value in [('branding/desktop-defaults/defaults',f'cursorTheme={cursor}'),('Skel/.config/kcminputrc',f'cursorTheme={cursor}'),
+                   ('Skel/.config/gtk-3.0/settings.ini',f'gtk-cursor-theme-name={cursor}'),('Skel/.config/gtk-4.0/settings.ini',f'gtk-cursor-theme-name={cursor}'),
+                   ('branding/i3/skel/.Xresources',f'Xcursor.theme: {cursor}'),('scripts/lib/install-i3.sh',f'cursor-theme-name={cursor}'),
+                   ('scripts/lib/remix.sh',f'CursorTheme={cursor}'),('scripts/lib/remix.sh',f'cursorTheme={cursor}')]:
+    assert value in (root/path).read_text(),(path,value)
+assert (root/'branding/cursors'/cursor/'index.theme').is_file()
+konsole=configparser.ConfigParser(interpolation=None);konsole.optionxform=str
+konsole.read(root/'branding/colourscheme/VIGILDark-Konsole.colorscheme')
+assert max(map(int,konsole['Background']['Color'].split(',')))<=48,'Konsole background must stay dark'
+assert 'ColorScheme=VIGILDark-Konsole' in (root/'scripts/lib/remix.sh').read_text()
+print('PASS: pinned vendor inputs, preserved dark login artwork, sized desktop wallpaper, dark defaults, cursor and login contrast')
 gtk2=(assets/'skel/.gtkrc-2.0').read_text()
 assert 'gtk-theme-name="VALYRIAN-Total-Steel"' in gtk2
 assert 'Requires: gtk-murrine-engine' in (root/'scripts/lib/install-i3.sh').read_text()
@@ -95,7 +129,7 @@ for path in (root/'scripts').rglob('*'):
             assert (root/'scripts'/ref).is_file(),f'Broken helper reference {path}: {ref}'
 print('PASS: active script references; all checks passed')
 
-for name in ['build-i3-lock.sh','build-guest.sh','remix.sh','install-i3.sh','install-default-apps.sh','package-branding.sh','package-release-common.sh','package-wallpaper-compat.sh','pack-prepared-root.sh','finish-prepared-image.sh','prepare-brand-assets.sh']:
+for name in ['build-i3-lock.sh','build-guest.sh','remix.sh','install-i3.sh','install-default-apps.sh','package-branding.sh','package-release-common.sh','package-wallpaper-compat.sh','package-vpm.sh','pack-prepared-root.sh','finish-prepared-image.sh','prepare-brand-assets.sh']:
     result=subprocess.run(['bash',root/'scripts/lib'/name],env={**os.environ,'VIGIL_BUILD_GUEST':'0'},capture_output=True,text=True,timeout=10)
     assert result.returncode!=0 and 'approved disposable builder' in result.stderr, f'Broken host guard/helper path: {name}: {result.stderr}'
 print('PASS: every internal build entry refuses host execution through its real guard')

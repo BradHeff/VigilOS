@@ -16,15 +16,20 @@ python3 - "$ROOT" "$WORK" <<'PY'
 from pathlib import Path
 import json,sys
 root,work=map(Path,sys.argv[1:])
-meta=json.loads((root/'usr/share/vigilos/wallpapers/VIGILOS/metadata.json').read_text())
+package=root/'usr/share/vigilos/wallpapers/VIGILOS-Desktop'
+meta=json.loads((package/'metadata.json').read_text())
 meta['KPlugin']['Id']='F44'
 (work/'SOURCES/wallpaper-compat-metadata.json').write_text(json.dumps(meta,indent=2,ensure_ascii=False)+'\n')
+images=sorted(p.name for p in (package/'contents/images').glob('*x*.jpg'))
+assert len(images)>=4,images
+(work/'SOURCES/wallpaper-compat-images').write_text(' '.join(images)+'\n')
 PY
+IMAGES="$(cat "$WORK/SOURCES/wallpaper-compat-images")"
 cp "$ROOT/usr/share/licenses/f44-backgrounds-base/CC-BY-SA-4.0" "$WORK/SOURCES/wallpaper-compat-LICENSE"
 cat >"$WORK/SPECS/vigilos-wallpaper-compat.spec" <<SPEC
 Name: vigilos-wallpaper-compat
 Version: $VIGIL_VERSION
-Release: 2%{?dist}
+Release: 3%{?dist}
 Summary: VIGIL OS KDE wallpaper with Fedora44 dependency compatibility
 License: CC-BY-SA-4.0
 BuildArch: noarch
@@ -34,7 +39,10 @@ Provides: f44-backgrounds-kde = $BASE_EVR
 Conflicts: f44-backgrounds-kde
 Obsoletes: f44-backgrounds-kde < 45
 Requires: kde-filesystem
-Requires: /usr/share/vigilos/wallpapers/VIGILOS/metadata.json
+Requires: /usr/share/vigilos/wallpapers/VIGILOS-Desktop/metadata.json
+SPEC
+cat >>"$WORK/SPECS/vigilos-wallpaper-compat.spec" <<SPEC
+%global images $IMAGES
 SPEC
 cat >>"$WORK/SPECS/vigilos-wallpaper-compat.spec" <<'SPEC'
 %description
@@ -46,8 +54,8 @@ Original base-art attribution and licenses remain with their upstream package.
 install -Dpm0644 %{SOURCE0} %{buildroot}/usr/share/wallpapers/F44/metadata.json
 install -Dpm0644 %{SOURCE1} %{buildroot}%{_licensedir}/%{name}/CC-BY-SA-4.0
 mkdir -p %{buildroot}/usr/share/wallpapers/F44/contents/images
-for image in 1920x1080 2560x1600 3440x1440 3840x2160; do
-    ln -s /usr/share/vigilos/wallpapers/VIGILOS/contents/images/$image.png %{buildroot}/usr/share/wallpapers/F44/contents/images/$image.png
+for image in %{images}; do
+    ln -s /usr/share/vigilos/wallpapers/VIGILOS-Desktop/contents/images/$image %{buildroot}/usr/share/wallpapers/F44/contents/images/$image
 done
 %files
 %license %{_licensedir}/%{name}/CC-BY-SA-4.0

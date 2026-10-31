@@ -2,7 +2,7 @@
 """Build VIGIL OS ISOs in disposable guests from verified Fedora inputs."""
 from __future__ import annotations
 import argparse, datetime, fcntl, hashlib, json, os, re, shlex, shutil
-import socket, subprocess, sys, threading, time, urllib.request
+import socket, subprocess, sys, threading, time, tomllib, urllib.request
 from pathlib import Path
 sys.dont_write_bytecode = True
 from version import BuildLock, preview_release, reserve_release
@@ -98,9 +98,55 @@ runcmd:
 def copy_source(work, release_dir):
     """Create read-only source media with frozen release metadata."""
     roots=['scripts','branding','Skel','PLASMA-CONFIGS','kickstarts','LICENSE','LICENSES']
+    extra=[f'vpm={release_dir / "vpm"}'] if (release_dir/'vpm').is_dir() else []
     run(['xorriso','-as','mkisofs','-quiet','-R','-J','-V','VIGIL_SOURCE',
          '-m','__pycache__','-m','*.pyc','-o',work/'source.iso','-graft-points',*[f'{name}={REPO/name}' for name in roots],
-         f'version.json={release_dir / "version.json"}', f'release.json={release_dir / "release.json"}'],cwd=REPO)
+         f'version.json={release_dir / "version.json"}', f'release.json={release_dir / "release.json"}',*extra],cwd=REPO)
+
+def vpm_source(args, parser):
+    """The VpM checkout to include, or None. ../VpM is used when present unless --no-vpm."""
+    if args.no_vpm: return None
+    source=(args.vpm or REPO.parent/'VpM').resolve()
+    if not (source/'Cargo.toml').is_file():
+        if args.vpm: parser.error(f'{source} is not a VpM source repository')
+        return None
+    return source
+
+def stage_vpm(source, parent, target_dir):
+    """Build and test VpM on this host, then stage it for the vpm RPM made in the builder."""
+    git=lambda *a: subprocess.run(['git','-C',source,*a],capture_output=True,text=True,check=True).stdout.strip()
+    if git('status','--porcelain'):
+        raise RuntimeError(f'{source} has uncommitted changes; commit them or use --no-vpm. No version was consumed')
+    # Keep this host's paths, and so the user name, out of the binaries.
+    cargo_home=Path(os.environ.get('CARGO_HOME',Path.home()/'.cargo')).resolve()
+    flags=[f'--remap-path-prefix={cargo_home}=/cargo',f'--remap-path-prefix={source}=/vpm']
+    env={**os.environ,'CARGO_TARGET_DIR':str(target_dir),'CARGO_ENCODED_RUSTFLAGS':'\x1f'.join(flags)}
+    env.pop('RUSTFLAGS',None)
+    record=parent/'vpm-build.log'
+    try:
+        with record.open('w') as output:
+            for step in (['build'],['test']):
+                run(['cargo',*step,'--release','--locked','--manifest-path',source/'Cargo.toml'],env=env,stdout=output,stderr=output)
+    except subprocess.CalledProcessError:
+        raise RuntimeError(f'VpM failed to build or test; see {record}. No version was consumed')
+    stage=parent/'vpm'
+    target=target_dir/'release'
+    files={'bin/vpm':target/'vpm','bin/vpm-build':target/'vpm-build','man/vpm.8':source/'man/vpm.8',
+           'man/vpm-build.1':source/'man/vpm-build.1','doc/README.md':source/'README.md',
+           'doc/FORMAT.md':source/'docs/FORMAT.md','doc/SIGNING.md':source/'docs/SIGNING.md'}
+    files.update({f'doc/examples/hello/{p.name}':p for p in sorted((source/'examples/hello').iterdir()) if p.is_file()})
+    for name,origin in files.items():
+        (stage/name).parent.mkdir(parents=True,exist_ok=True)
+        shutil.copy2(origin,stage/name)
+        if str(Path.home()).encode() in (stage/name).read_bytes():
+            raise RuntimeError(f'{stage / name} contains this host\'s home directory. No version was consumed')
+    version=tomllib.loads((source/'Cargo.toml').read_text())['workspace']['package']['version']
+    provenance={'name':'vpm','version':version,'release':f'{git("rev-list","--count","HEAD")}.git{git("rev-parse","--short=10","HEAD")}',
+                'commit':git('rev-parse','HEAD'),
+                'rustc':subprocess.run(['rustc','-V'],capture_output=True,text=True,check=True).stdout.strip(),
+                'files':{name:sha(stage/name) for name in files}}
+    (stage/'PROVENANCE.json').write_text(json.dumps(provenance,indent=2)+'\n')
+    return provenance
 
 def stream_build(command, work, qemu, timeout):
     """Record guest output and enforce build timeouts."""
@@ -110,7 +156,7 @@ def stream_build(command, work, qemu, timeout):
         with (work/'build.log').open('w') as logfile:
             for line in process.stdout:
                 logfile.write(line); logfile.flush(); last_output[0]=time.monotonic()
-                if any(t in line for t in ['===','ERROR:','Verified candidate:','VIGIL_RESULT','Candidate ISO:','Packing EROFS','RPM integrity','i3 desktop installed']):
+                if any(t in line for t in ['===','ERROR:','Verified candidate:','VIGIL_RESULT','Candidate ISO:','Packing EROFS','RPM integrity','i3 desktop installed','installed in the image']):
                     print(line.rstrip(),flush=True)
     reader=threading.Thread(target=consume,daemon=True); reader.start()
     deadline=time.monotonic()+timeout; pulse=time.monotonic()
@@ -200,18 +246,23 @@ def main():
     parser.add_argument('--bootstrap-timeout',type=int,default=1800)
     parser.add_argument('--build-timeout',type=int,default=10800)
     parser.add_argument('--check',action='store_true',help='check host prerequisites/source without starting a VM or downloading')
+    parser.add_argument('--vpm',type=Path,default=None,help='VpM source repository to build into the ISO (default: ../VpM when present)')
+    parser.add_argument('--no-vpm',action='store_true',help='build the ISO without VpM')
     args=parser.parse_args()
+    args.vpm_source=vpm_source(args,parser)
     args.workspace=args.workspace.resolve()
     args.output=args.output.resolve() if args.output else None
     args.cache=(args.cache or args.workspace/'cache').resolve()
     needed=['python3','bash','curl','gpgv','ssh','ssh-keygen','xorriso','qemu-img','qemu-system-x86_64']
+    if args.vpm_source: needed+=['cargo','rustc','git']
     missing=[x for x in needed if not shutil.which(x)]
     if missing:parser.error('Install these host tools first: '+', '.join(missing))
     if not os.access('/dev/kvm',os.R_OK|os.W_OK):parser.error('Existing usable /dev/kvm required; no host permission changes are made')
     run(['bash',REPO/'scripts/validate.sh'])
     upcoming=preview_release(REPO/'version.json')
+    included=f'VpM from {args.vpm_source}' if args.vpm_source else 'no VpM'
     if args.check:
-        log(f'Host prerequisites and source checks passed; next release {upcoming.version} ({upcoming.codename}); version counter unchanged')
+        log(f'Host prerequisites and source checks passed; next release {upcoming.version} ({upcoming.codename}) with {included}; version counter unchanged')
         return
 
     with BuildLock(REPO) as release_lock:
@@ -233,9 +284,14 @@ def build_locked_workspace(args, release_lock):
     if args.output.exists() and (not args.output.is_dir() or any(args.output.iterdir())):
         raise RuntimeError('Fresh output directory required; no version was consumed')
     inputs=verify_inputs(args.cache,parent)
+    vpm=None
+    if args.vpm_source:
+        log(f'Building and testing VpM from {args.vpm_source}')
+        vpm=stage_vpm(args.vpm_source,parent,args.workspace/'vpm-target')
+        log(f'VpM {vpm["version"]}-{vpm["release"]} staged for the ISO')
     args.release=reserve_release(REPO,parent,stamp,release_lock)
     log(f'Reserved VIGIL OS {args.release.version} ({args.release.codename}) for this run; both editions share this version')
-    result={'release':args.release.record(),'desktop':args.desktop,'output':str(args.output),'status':'running'}
+    result={'release':args.release.record(),'desktop':args.desktop,'output':str(args.output),'vpm':vpm,'status':'running'}
     (parent/'RUN.json').write_text(json.dumps(result,indent=2)+'\n')
     try:
         for desktop in (['kde','i3'] if args.desktop=='both' else [args.desktop]):

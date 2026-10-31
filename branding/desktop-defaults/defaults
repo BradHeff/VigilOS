@@ -8,7 +8,7 @@ ColorScheme=VIGILDark
 Theme=Slot-Beauty-Dark-Icons
 
 [kcminputrc][Mouse]
-cursorTheme=oreo_white_cursors
+cursorTheme=Qogir-white-cursors
 
 [kwinrc][org.kde.kdecoration2]
 library=org.kde.breeze

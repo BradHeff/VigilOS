@@ -6,9 +6,16 @@ grants and applicable upstream or copyleft licences remain effective.
 
 Imported themes, icons, fonts and helpers retain their file-level notices.
 These include the PurPur themes, the imported GTK and icon themes, the
-Git prompt helper, hfetch, Rofi themes, Iosevka and Feather fonts, Greenclip
-and i3lock-color. Keep their original authors and licences. This list is
-not a substitute for the notices and licence files distributed with them.
+Git prompt helper, hfetch, Rofi themes, Qogir cursors, Iosevka and Feather
+fonts, Greenclip and i3lock-color. Keep their original authors and licences.
+This list is not a substitute for the notices and licence files distributed
+with them.
+
+The desktop wallpaper, branding/wallpapers/wallpaper.png and the sizes made
+from it in branding/wallpapers/VIGILOS-Desktop, is a painting by byrotek
+(https://www.deviantart.com/byrotek), used in VIGIL OS with the artist's
+permission. It is not VIGIL-owned, the root LICENSE does not apply to it, and
+this credit must stay with it.
 
 Fedora packages, repositories, keys, signed boot components and their
 licences retain upstream provenance. Runtime RPM licensing metadata must

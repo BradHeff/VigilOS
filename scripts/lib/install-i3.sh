@@ -118,6 +118,8 @@ background=/usr/share/vigilos/wallpapers/VIGILOS/contents/images/3840x2160.png
 user-background=false
 theme-name=VALYRIAN-Total-Steel
 icon-theme-name=Slot-Beauty-Dark-Icons
+cursor-theme-name=Qogir-white-cursors
+cursor-theme-size=24
 font-name=Iosevka Nerd Font 11
 CONF
 cat > "$ROOT/etc/systemd/system/vigilos-i3-live.service" <<'UNIT'

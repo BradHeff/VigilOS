@@ -1,0 +1,90 @@
+{
+  "description": "Desktop wallpaper, a painting by byrotek used with the artist's permission. Each size is cropped from the centre to its aspect ratio and resized with Lanczos, never stretched; sizes wider than the source are upscaled.",
+  "artist": {
+    "Name": "byrotek",
+    "Website": "https://www.deviantart.com/byrotek"
+  },
+  "source": {
+    "file": "wallpaper.png",
+    "sha256": "174d68a1e760a1b32fc54da3c351dfc7e9e810beece0abcf7d3827f31c166abc",
+    "width": 1920,
+    "height": 1339
+  },
+  "variants": {
+    "1366x768.jpg": {
+      "sha256": "d3d9c90a5b386b7acb645fded447b989ad06debee43211cbc3fe137d6f9ab949",
+      "width": 1366,
+      "height": 768
+    },
+    "1600x900.jpg": {
+      "sha256": "f395aa347d6598e8d8b0ae4dd2281091da5aa85b34ef1326fc5040d68062f23e",
+      "width": 1600,
+      "height": 900
+    },
+    "1920x1080.jpg": {
+      "sha256": "d18e813bed9bcba943628a992fd8500a1dc0402cf9f215b0bb422fa92c73a01f",
+      "width": 1920,
+      "height": 1080
+    },
+    "2560x1440.jpg": {
+      "sha256": "9c29b854aac501defdc258f413487bbc6237add5f8933c94a09380d006fe3f57",
+      "width": 2560,
+      "height": 1440
+    },
+    "3840x2160.jpg": {
+      "sha256": "ef3e59f1b005d50deb7423e5667f6fd9f8b3ef0cfc49b3c806447e10c494aea3",
+      "width": 3840,
+      "height": 2160
+    },
+    "1280x800.jpg": {
+      "sha256": "2edfaec4dabbd8a84c2c6a91f247ce1ede9b7998c2c6baebb577597b50a54abc",
+      "width": 1280,
+      "height": 800
+    },
+    "1440x900.jpg": {
+      "sha256": "565bac60b5d91760511d8b22f6fb52663bb49682284ff79afca0fb0448012120",
+      "width": 1440,
+      "height": 900
+    },
+    "1680x1050.jpg": {
+      "sha256": "b473473f223eceb535325b565584901219353f32836b6d09a8be79898614f036",
+      "width": 1680,
+      "height": 1050
+    },
+    "1920x1200.jpg": {
+      "sha256": "f78db9d29303b6f4364b0f61e1a31b29433697845df25a154f44ae688b6edb8d",
+      "width": 1920,
+      "height": 1200
+    },
+    "2560x1600.jpg": {
+      "sha256": "2ad8a938684c67b9086be57a9bfbd309c0d330f0ed5cd8aeb4819171d6327de6",
+      "width": 2560,
+      "height": 1600
+    },
+    "2560x1080.jpg": {
+      "sha256": "346f51293bf986b625b24cb2f441aa7d006010523964088ff5c1cd908d250305",
+      "width": 2560,
+      "height": 1080
+    },
+    "3440x1440.jpg": {
+      "sha256": "b58c3adaf09e90220ba3a4b195e77faa9d477c5dd36ce024d871db053b91d7fb",
+      "width": 3440,
+      "height": 1440
+    },
+    "1024x768.jpg": {
+      "sha256": "f9e360c076c27a39594710a7d9a2ba08e42f38c6d782bc5681a8e0bdb172df48",
+      "width": 1024,
+      "height": 768
+    },
+    "1600x1200.jpg": {
+      "sha256": "690512ffb65ad690ad4d82e2ebacba00f73012e276928eadfcf93e55bf3d7a87",
+      "width": 1600,
+      "height": 1200
+    },
+    "1280x1024.jpg": {
+      "sha256": "221341356b3f6d19a50ed1ef1012e2884262b808b78c2bc90734f65f2124efac",
+      "width": 1280,
+      "height": 1024
+    }
+  }
+}

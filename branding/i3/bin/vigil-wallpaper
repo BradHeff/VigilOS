@@ -1,2 +1,22 @@
-#!/usr/bin/env sh
-exec feh --no-fehbg --image-bg "#1e1e1e" --bg-max /usr/share/vigilos/wallpapers/VIGILOS/contents/images/3840x2160.png
+#!/usr/bin/env bash
+# Give each monitor the wallpaper size closest to its shape, filled without stretching.
+dir=/usr/share/vigilos/wallpapers/VIGILOS-Desktop/contents/images
+
+pick() {
+    ls "$dir" | awk -F'[x.]' -v w="$1" -v h="$2" -v dir="$dir" '
+        $3 == "jpg" {
+            shape = $1 / $2 - w / h; if (shape < 0) shape = -shape
+            size = $1 - w; if (size < 0) size = -2 * size
+            score = shape * 25000 + size
+            if (best == "" || score < low) { best = $0; low = score }
+        }
+        END { if (best != "") print dir "/" best }'
+}
+
+images=()
+while read -r w h; do
+    image="$(pick "$w" "$h")"
+    [[ -n "$image" ]] && images+=("$image")
+done < <(xrandr --listactivemonitors 2>/dev/null | awk 'NR > 1 { split($3, a, /[x\/+]/); print a[1], a[3] }')
+[[ ${#images[@]} -gt 0 ]] || images=("$dir/1920x1080.jpg")
+exec feh --no-fehbg --bg-fill "${images[@]}"
