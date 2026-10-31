@@ -180,6 +180,7 @@ print('CHECKOUT_LOCK_REFUSAL_PASS')
         for name in ['scripts','branding','Skel','PLASMA-CONFIGS','kickstarts','LICENSES']:
             path=self.repo/name;path.mkdir();(path/'fixture.txt').write_text(name)
         (self.repo/'LICENSE').write_text('test fixture')
+        (self.repo/'README.md').write_text('Wallpaper credit: https://www.deviantart.com/byrotek')
         work=run/'kde';work.mkdir()
         with patch.object(build,'REPO',self.repo):build.copy_source(work,run)
         extracted=self.base/'extracted-release.json'
@@ -188,6 +189,9 @@ print('CHECKOUT_LOCK_REFUSAL_PASS')
         legal=self.base/'extracted-licence.txt'
         subprocess.run(['xorriso','-osirrox','on','-indev',str(work/'source.iso'),'-extract','/LICENSES/fixture.txt',str(legal)],check=True,capture_output=True,timeout=15)
         self.assertEqual(legal.read_text(),'LICENSES')
+        readme=self.base/'extracted-README.md'
+        subprocess.run(['xorriso','-osirrox','on','-indev',str(work/'source.iso'),'-extract','/README.md',str(readme)],check=True,capture_output=True,timeout=15)
+        self.assertEqual(readme.read_text(),(self.repo/'README.md').read_text())
         self.assertEqual(load_config(self.config)['build_number'],3)
 
     def test_invalid_configuration_and_snapshot_rejected(self):

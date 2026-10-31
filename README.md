@@ -4,23 +4,29 @@ VIGIL OS is a Linux distribution based on Fedora 44, created by Brad Heffernan. 
 
 The KDE edition includes SDDM, Dolphin, Konsole, Kate and Discover. The i3 edition includes LightDM, Polybar, Rofi, i3lock-color, Greenclip, Alacritty and Thunar. Both come with Brave as the default browser, LibreOffice, Node.js, npm, Python and Flatpak. System updates come from the signed Fedora and Brave repositories through RPM and DNF5.
 
-VIGIL OS is still in development. The 1.2 images passed these tests in virtual machines: live boot with BIOS and UEFI, a fresh UEFI install, logging in to and rebooting the installed system, updates, unlocking the lock screen, and display checks. They have not been tested on physical hardware or with Secure Boot. Passing the source checks doesn't mean a new ISO works; each new build still needs testing.
+VIGIL OS is still in development. Both 1.6 editions passed UEFI live boot, a fresh UEFI install, booting without the ISO, login and the VpM example-package workflow in virtual machines. The VpM tests ran with SELinux enforcing. The earlier 1.2 images also passed BIOS live boot, installed-system reboot, updates, lock-screen and display checks; those broader checks have not been repeated on 1.6. Physical hardware and Secure Boot remain untested. Passing the source checks doesn't mean a new ISO works; each new build still needs testing.
 
 ## Screenshots
 
+Version 1.6 (Loopback), captured at 1920×1080.
+
 ### KDE Plasma
 
-![VIGIL OS KDE Plasma desktop](images/KDE-Desktop.png)
+![VIGIL OS 1.6 KDE Plasma desktop](images/kde-desktop-1.6.png)
 
-| Application menu | Live environment |
+| Application menu | Welcome Center |
 | --- | --- |
-| ![KDE application menu](images/KDE-Menu.png) | ![KDE live desktop and welcome window](images/KDE-Live.png) |
+| ![KDE application menu](images/kde-menu-1.6.png) | ![Installed KDE desktop and Welcome Center](images/kde-welcome-1.6.jpg) |
+
+![KDE SDDM login screen](images/kde-login-1.6.jpg)
 
 ### i3
 
-| Desktop | Login |
+![VIGIL OS 1.6 i3 desktop with Polybar](images/i3-desktop-1.6.png)
+
+| Application launcher | Login |
 | --- | --- |
-| ![VIGIL OS i3 desktop with Polybar](images/i3-desktop.png) | ![VIGIL OS i3 LightDM login screen](images/i3-login.png) |
+| ![i3 application launcher](images/i3-menu-1.6.png) | ![i3 LightDM login screen](images/i3-login-1.6.png) |
 
 ## Building the ISO
 
@@ -49,6 +55,12 @@ Version numbers have the form `build_number.version_number`. For a bigger releas
 VpM is the package manager being written for VIGIL OS. It is developed in its own repository, which isn't public yet. VpM packages install under `/opt/vpm`, next to RPM, and RPM and DNF5 stay in charge of the rest of the system.
 
 VpM can already build, sign and verify packages, and install and remove them with SELinux labels and sandboxed install scripts. So far it has changed a running system only inside test VMs. On an installed system it stays switched off until an administrator creates `/etc/vpm/allow-running-system`.
+
+On both installed 1.6 editions, the `hello` example passed reproducible builds, encrypted-key signing, dry-run planning, refusal to install while switched off, signed installation with its sandboxed script, execution, verification and removal. The running-system switch was removed afterward.
+
+| VpM results on KDE | VpM results on i3 |
+| --- | --- |
+| ![VpM installation, verification and removal results in Konsole](images/kde-vpm-1.6.png) | ![VpM installation, verification and removal results in Alacritty](images/i3-vpm-1.6.png) |
 
 When a VpM checkout sits next to this repository in `../VpM`, the ISO build compiles and tests it on this machine and installs it in both editions as the `vpm` RPM. That needs cargo, git, a C compiler and `sqlite-devel`, and the checkout must have no uncommitted changes. `--vpm DIR` uses a checkout somewhere else and `--no-vpm` leaves VpM out. On the installed system, `man vpm` is the reference and `/usr/share/vpm/examples/hello` is an example package to build.
 
