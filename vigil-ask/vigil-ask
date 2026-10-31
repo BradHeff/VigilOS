@@ -1,0 +1,8 @@
+#!/usr/bin/python3 -I
+import sys
+from pathlib import Path
+sys.dont_write_bytecode = True
+here = Path(__file__).resolve().parent
+sys.path.insert(0, str(here if (here / 'vigil_ask').is_dir() else Path('/usr/share/vigil-ask')))
+from vigil_ask.cli import main
+sys.exit(main())

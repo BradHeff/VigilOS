@@ -4,6 +4,7 @@ if /usr/local/libexec/vigilos-is-live; then
     notify-send "VIGIL OS" "Screen locking is enabled after installation, with your account password."
     exit 0
 fi
+! command -v vigil-ask >/dev/null || vigil-ask cancel >/dev/null 2>&1 &
 wallpaper=/usr/share/vigilos/wallpapers/VIGILOS/contents/images/3840x2160.png
 dimensions=$(xrandr --current | sed -n 's/^Screen .* current \([0-9]*\) x \([0-9]*\),.*/\1x\2/p')
 width=${dimensions%x*}; height=${dimensions#*x}

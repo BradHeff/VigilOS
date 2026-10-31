@@ -6,6 +6,7 @@ wm_pid=
 session_started=0
 cleanup() {
     trap - EXIT HUP INT TERM
+    ! command -v vigil-ask >/dev/null || timeout 5 vigil-ask cancel || true
     for child in "$locker_pid" "$wm_pid"; do
         [[ -n "$child" ]] || continue
         kill -TERM "$child" 2>/dev/null || true
@@ -19,7 +20,8 @@ trap cleanup EXIT
 trap 'exit 0' HUP INT TERM
 export QT_QPA_PLATFORMTHEME=gtk3
 export XDG_CURRENT_DESKTOP=i3
-dbus-update-activation-environment --systemd DISPLAY XAUTHORITY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_SESSION_DESKTOP QT_QPA_PLATFORMTHEME
+export TERMINAL="${TERMINAL:-alacritty}"
+dbus-update-activation-environment --systemd DISPLAY XAUTHORITY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_SESSION_DESKTOP QT_QPA_PLATFORMTHEME TERMINAL
 session_started=1
 systemctl --user start vigilos-i3-session.target
 export VIGIL_I3_LOCK_MANAGED=1

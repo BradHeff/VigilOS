@@ -2,7 +2,7 @@
 
 VIGIL OS is a Linux distribution based on Fedora 44, created by Brad Heffernan. It comes in two editions: KDE Plasma on Wayland, and i3 on X11. Both use the dark VIGIL artwork on the boot, login and lock screens and in the installer, with a lighter landscape painting by [byrotek](https://www.deviantart.com/byrotek) on the desktop, used with the artist's permission. Both default to dark themes and the white Qogir cursor.
 
-The KDE edition includes SDDM, Dolphin, Konsole, Kate and Discover. The i3 edition includes LightDM, Polybar, Rofi, i3lock-color, Greenclip, Alacritty and Thunar. Both come with Brave as the default browser, LibreOffice, Node.js, npm, Python and Flatpak. System updates come from the signed Fedora and Brave repositories through RPM and DNF5.
+The KDE edition includes SDDM, Dolphin, Konsole, Kate and Discover. The i3 edition includes LightDM, Polybar, Rofi, i3lock-color, Greenclip, Alacritty and Thunar. Both come with Brave as the default browser, LibreOffice, Node.js, npm, Python, Flatpak and VIGIL Ask. System updates come from the signed Fedora and Brave repositories through RPM and DNF5.
 
 VIGIL OS is still in development. Both 1.6 editions passed UEFI live boot, a fresh UEFI install, booting without the ISO, login and the VpM example-package workflow in virtual machines. The VpM tests ran with SELinux enforcing. The earlier 1.2 images also passed BIOS live boot, installed-system reboot, updates, lock-screen and display checks; those broader checks have not been repeated on 1.6. Physical hardware and Secure Boot remain untested. Passing the source checks doesn't mean a new ISO works; each new build still needs testing.
 
@@ -73,6 +73,14 @@ bash scripts/test-vpm.sh --points ''     # skip the power-cut tests
 ```
 
 The script boots the same verified Fedora 44 Cloud image the builds use, and builds VpM and its test packages on this machine. It then runs VpM's system tests as root inside the VM, with SELinux enforcing. For each power-cut test it pauses an install or removal, kills the VM, boots it again and checks that VpM recovers. Nothing is installed on this machine, and the results go in `.build/vpm-test/`.
+
+## VIGIL Ask
+
+VIGIL Ask is a small window for quick questions, answered by [Claude Code](https://code.claude.com/docs) from Anthropic. Questions, and anything you attach, are processed in the cloud under your own Claude account, which needs a paid Claude plan or a Claude Console account. Claude Code itself isn't in the ISO. The first time you open VIGIL Ask, it offers to install Claude Code from Anthropic's signed repository, which asks for an administrator password. That repository ships turned off, so system updates don't contact Anthropic until you install it.
+
+VIGIL Ask runs Claude Code without tools, MCP servers or your own Claude Code settings, so it can answer but can't run commands or change files. For hands-on work, **Open in Claude Code** starts a full session in a folder you choose, with your question typed in but not sent.
+
+On i3, Super+Shift+A asks through Rofi and Super+Ctrl+A attaches the selected text. Polybar shows the status, and Thunar's Send To menu attaches files. Locking the screen or logging out stops an answer in progress. On KDE it's in the application menu for now; KRunner and shortcuts come later. `man vigil-ask` has the details, and `bash scripts/test-vigil-ask.sh` tests it in a throwaway Fedora 44 VM, with results in `.build/vigil-ask-test/`.
 
 ## Future plans
 

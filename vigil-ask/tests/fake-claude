@@ -1,0 +1,46 @@
+#!/usr/bin/python3
+"""Stands in for claude in tests. FAKE_CLAUDE_MODE: ok, auth, slow, crash, plain."""
+import json, os, signal, sys, time
+mode = os.environ.get('FAKE_CLAUDE_MODE', 'ok')
+args = sys.argv[1:]
+if args == ['--version']:
+    print(f'{os.environ.get("FAKE_CLAUDE_VERSION", "2.1.309")} (Claude Code)')
+    sys.exit(0)
+if args[:2] == ['auth', 'status']:
+    signed_in = os.environ.get('FAKE_CLAUDE_SIGNED_IN', '1') == '1'
+    print(json.dumps({'loggedIn': signed_in, 'authMethod': 'claude.ai' if signed_in else 'none'}))
+    sys.exit(0 if signed_in else 1)
+stdin = sys.stdin.read()
+session = args[args.index('--resume') + 1] if '--resume' in args else 'fake-session-1'
+with open(os.environ['FAKE_CLAUDE_LOG'], 'a') as log:
+    log.write(json.dumps({'argv': args, 'stdin': stdin, 'cwd': os.getcwd(), 'pid': os.getpid()}) + '\n')
+def emit(event):
+    print(json.dumps({**event, 'session_id': session}), flush=True)
+stopped = []
+signal.signal(signal.SIGINT, lambda *_: stopped.append(1))
+emit({'type': 'system', 'subtype': 'init', 'tools': []})
+if mode == 'crash':
+    print('Error: something broke', file=sys.stderr)
+    sys.exit(3)
+if mode == 'auth':
+    emit({'type': 'assistant', 'error': 'authentication_failed', 'message': {'content': [{'type': 'text', 'text': 'Not logged in · Please run /login'}]}})
+    emit({'type': 'result', 'subtype': 'success', 'is_error': True, 'result': 'Not logged in · Please run /login'})
+    sys.exit(1)
+answer = ['Fake ', 'answer ', 'for ', 'tests.']
+if mode == 'plain':
+    emit({'type': 'assistant', 'message': {'content': [{'type': 'text', 'text': ''.join(answer)}]}})
+else:
+    emit({'type': 'stream_event', 'event': {'type': 'message_start'}})
+    for chunk in answer:
+        if stopped:
+            break
+        emit({'type': 'stream_event', 'event': {'type': 'content_block_delta', 'delta': {'type': 'text_delta', 'text': chunk}}})
+        for _ in range(100 if mode == 'slow' else 0):
+            if stopped:
+                break
+            time.sleep(0.05)
+    emit({'type': 'assistant', 'message': {'content': [{'type': 'text', 'text': ''.join(answer)}]}})
+if stopped:
+    emit({'type': 'result', 'subtype': 'error_during_execution', 'is_error': True, 'result': ''})
+    sys.exit(1)
+emit({'type': 'result', 'subtype': 'success', 'is_error': False, 'result': ''.join(answer)})

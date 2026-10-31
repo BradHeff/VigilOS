@@ -1,0 +1,21 @@
+[Desktop Entry]
+Type=Application
+Name=VIGIL Ask
+GenericName=Quick questions
+Comment=Ask a quick question. Uses Claude Code by Anthropic, in the cloud.
+Exec=vigil-ask window
+Icon=org.vigilos.Ask
+Terminal=false
+Categories=Utility;
+Keywords=ask;question;answer;assistant;
+StartupNotify=false
+SingleMainWindow=true
+Actions=selection;last;
+
+[Desktop Action selection]
+Name=Ask about the selected text
+Exec=vigil-ask window --selection
+
+[Desktop Action last]
+Name=Reopen the last conversation
+Exec=vigil-ask window --last

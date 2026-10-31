@@ -97,7 +97,7 @@ runcmd:
 
 def copy_source(work, release_dir):
     """Create read-only source media with frozen release metadata."""
-    roots=['scripts','branding','Skel','PLASMA-CONFIGS','kickstarts','README.md','LICENSE','LICENSES']
+    roots=['scripts','branding','Skel','PLASMA-CONFIGS','kickstarts','vigil-ask','README.md','LICENSE','LICENSES']
     extra=[f'vpm={release_dir / "vpm"}'] if (release_dir/'vpm').is_dir() else []
     run(['xorriso','-as','mkisofs','-quiet','-R','-J','-V','VIGIL_SOURCE',
          '-m','__pycache__','-m','*.pyc','-o',work/'source.iso','-graft-points',*[f'{name}={REPO/name}' for name in roots],

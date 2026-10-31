@@ -1,0 +1,85 @@
+.TH VIGIL-ASK 1 2026-10-31 "VIGIL OS" "User Commands"
+.SH NAME
+vigil-ask \- ask a quick question from the desktop
+.SH SYNOPSIS
+.B vigil-ask
+.RB [ window ]
+.RB [ \-\-selection ]
+.RB [ \-\-file
+.IR FILE ]...
+.RB [ \-\-history
+.IR ID " | " \-\-last ]
+.br
+.B vigil-ask prompt
+.br
+.B vigil-ask history
+.br
+.B vigil-ask ask
+.RB [ \-\-selection ]
+.RB [ \-\-file
+.IR FILE ]...
+.RB [ \-\-resume
+.IR SESSION ]
+.RI [ QUESTION ...| \- ]
+.br
+.B vigil-ask status
+.RB [ \-\-follow ]
+.RB [ \-\-polybar ]
+.br
+.B vigil-ask cancel
+.SH DESCRIPTION
+VIGIL Ask answers quick questions in a small window shared by the Plasma and i3 editions.
+It uses Claude Code by Anthropic, so questions and anything attached to them are processed in the cloud under your Claude account.
+Claude Code needs a paid Claude plan or a Claude Console account.
+.PP
+In VIGIL Ask, Claude Code runs with no tools, no MCP servers and none of your Claude Code settings, from an empty folder of its own.
+It can answer, but it cannot run commands, read or change files, or browse.
+For hands-on work, \fBOpen in Claude Code\fR starts an interactive session in a folder you choose, with the question typed in but not sent.
+.PP
+Nothing is collected in the background.
+The selection and files are attached only when you ask for them, and you see each attachment before anything is sent.
+.SH COMMANDS
+.TP
+.B window
+Open the window, or bring the open one forward.
+\fB\-\-selection\fR attaches the primary selection, \fB\-\-file\fR attaches a UTF-8 text file of up to 512 KiB,
+\fB\-\-history\fR reopens a conversation from history and \fB\-\-last\fR the most recent one.
+.TP
+.B prompt
+Ask through a Rofi prompt and show the answer in the window.
+.TP
+.B history
+Pick a recent conversation in Rofi.
+.TP
+.B ask
+Ask in the terminal and print the answer as it arrives. The session ID is printed last, for \fB\-\-resume\fR.
+.TP
+.B status
+Print idle, working, done, stopped, failed, signin, missing or off. It never includes question text.
+.TP
+.B cancel
+Stop the question being answered, in the window or in a terminal. The i3 edition runs this before locking and when you log out.
+.SH DESKTOP
+On i3, Super+Shift+A asks through Rofi and Super+Ctrl+A opens the window with the selection attached.
+The Polybar module shows the status; click it to ask, middle-click for history and right-click to reopen the last conversation.
+In Thunar, \fBSend To\fR > \fBVIGIL Ask\fR attaches the selected text files.
+.SH FIRST USE
+If Claude Code is missing, the window offers to install it from Anthropic's signed repository,
+\fI/etc/yum.repos.d/claude-code.repo\fR, which ships turned off.
+Installing asks for an administrator password, then turns the repository on so Claude Code updates with the rest of the system.
+Before the first question the window explains where questions go, and it opens a terminal for \fBclaude auth login\fR when you need to sign in.
+.SH FILES
+.TP
+.I ~/.config/vigil-ask/config.json
+\fBenabled\fR (true), \fBhistory_days\fR (30; 0 keeps no history), \fBmodel\fR (Claude Code's default when null) and \fBnotice_accepted\fR.
+.TP
+.I ~/.local/state/vigil-ask/history.json
+Recent questions and answers, readable only by you.
+.TP
+.I ~/.claude
+Claude Code's own transcripts, kept by Claude Code.
+.TP
+.I /etc/vigil-ask/disabled
+When this file exists, VIGIL Ask is off for every user.
+.SH SEE ALSO
+.BR claude (1)

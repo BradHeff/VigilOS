@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=VIGIL Ask
+Comment=Ask about this file. Uses Claude Code by Anthropic, in the cloud.
+Icon=org.vigilos.Ask
+Exec=vigil-ask window --file %F
+TryExec=vigil-ask
+MimeType=text/plain;
+Terminal=false

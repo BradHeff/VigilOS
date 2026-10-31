@@ -33,6 +33,9 @@ bindsym $mod+a exec --no-startup-id rofi -show drun -no-default-config -config ~
 bindsym $mod+s exec --no-startup-id thunar ~/Pictures/Screenshots/
 bindsym $mod+d exec --no-startup-id rofi -show drun -no-default-config -config ~/.config/rofi/main.rasi
 
+bindsym $mod+Shift+a exec --no-startup-id vigil-ask prompt
+bindsym $mod+Ctrl+a exec --no-startup-id vigil-ask window --selection
+
 bindsym $mod+z exec --no-startup-id rofi -modi "clipboard:greenclip print" -show clipboard -run-command '{cmd}' -no-default-config -config ~/.config/rofi/main.rasi
 bindsym $mod+x exec --no-startup-id rofi-powermenu
 bindsym $mod+c exec --no-startup-id rofi-screenshot
@@ -118,6 +121,7 @@ for_window [window_type="dialog"] floating enable
 for_window [window_type="menu"] floating enable
 
 for_window [class="org.gnome.FileRoller"] floating enable
+for_window [class="vigil-ask-window"] floating enable, move position center
 
 for_window [title="Picture-in-Picture"] sticky enable
 

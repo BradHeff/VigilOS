@@ -8,7 +8,7 @@ from version import load_config, source_release
 root=Path(__file__).resolve().parents[2]
 required=['scripts/build-and-brand.sh','scripts/lib/build.py','version.json','scripts/lib/version.py','scripts/lib/product-version.sh','scripts/lib/prepare-release.py','scripts/lib/test-versioning.py','scripts/lib/build-guest.sh','scripts/lib/remix.sh','scripts/lib/install-i3.sh','scripts/lib/guest-setup.sh','branding/logos/source/vigil-mark.svg','branding/i3/skel/.git-prompt.bash','branding/i3/fonts/Feather-LICENSE','branding/i3/rofi-LICENSE']
 for name in required:assert (root/name).is_file(),f'Missing {name}'
-for directory in [root/'scripts',root/'branding/i3/bin']:
+for directory in [root/'scripts',root/'branding/i3/bin',root/'vigil-ask']:
     for path in directory.rglob('*'):
         if not path.is_file():continue
         if path.suffix=='.py' or path.read_bytes().startswith((b'#!/usr/bin/python3',b'#!/usr/bin/env python3')):ast.parse(path.read_text(),filename=str(path))
@@ -123,13 +123,44 @@ if shutil.which('i3'):
     with tempfile.TemporaryDirectory(prefix='vigil-i3-check-') as runtime:
         subprocess.run(['i3','-C','-c',config],check=True,env={**os.environ,'XDG_RUNTIME_DIR':runtime})
 print('PASS: clean portable i3 defaults, terminal imports and prompt')
+ask=root/'vigil-ask'
+key=root/'branding/repos/pki/claude-code.asc'
+assert hashlib.sha256(key.read_bytes()).hexdigest()=='bd70a5e4a268002704024ceba7f8446024114e94f3f0bdd11c23a9e592be81c6','Claude Code key changed'
+if shutil.which('gpg'):
+    with tempfile.TemporaryDirectory(prefix='vigil-key-') as keyhome:
+        shown=subprocess.run(['gpg','--homedir',keyhome,'--batch','--show-keys','--with-colons',key],capture_output=True,text=True,check=True).stdout
+    assert 'fpr:::::::::31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE:' in shown,'Claude Code key fingerprint differs'
+repo_cfg=configparser.ConfigParser(interpolation=None);repo_cfg.read(root/'branding/repos/claude-code.repo');claude_repo=repo_cfg['claude-code']
+assert (claude_repo['enabled'],claude_repo['gpgcheck'],claude_repo['repo_gpgcheck'],claude_repo['sslverify'])==('0','1','1','1'),'Claude Code repository must ship off with signature checks'
+assert claude_repo['gpgkey']=='file:///etc/pki/rpm-gpg/RPM-GPG-KEY-claude-code'
+assert claude_repo['baseurl'].startswith('https://downloads.claude.ai/claude-code/rpm/') and '$' not in claude_repo['baseurl']
+spec=(ask/'vigil-ask.spec').read_text()
+assert not any(line.startswith('Requires:') and 'claude' in line for line in spec.splitlines()),'VIGIL Ask must work without Claude Code installed'
+assert '%config(noreplace) %{_sysconfdir}/yum.repos.d/claude-code.repo' in spec
+if shutil.which('desktop-file-validate'):
+    for entry in ['org.vigilos.Ask.desktop','vigil-ask-sendto.desktop']:subprocess.run(['desktop-file-validate',ask/'system'/entry],check=True)
+i3_text=(assets/'skel/.config/i3/config').read_text()
+assert not re.search(r'^\s*set\s+\$\S+\s+.*\$',i3_text,re.M),'i3 does not expand a variable inside another variable'
+for value in ['bindsym $mod+Shift+a exec --no-startup-id vigil-ask prompt','bindsym $mod+Ctrl+a exec --no-startup-id vigil-ask window --selection','for_window [class="vigil-ask-window"] floating enable']:
+    assert value in i3_text,value
+bar_cfg=configparser.ConfigParser(interpolation=None,strict=False);bar_cfg.read_string('[top]\n'+bar)
+assert bar_cfg['module/vigil-ask']['exec']=='vigil-ask status --follow --polybar' and 'vigil-ask' in bar_cfg['bar/main']['modules-right'].split()
+for path in ['bin/lock','bin/vigil-i3-run']:assert 'vigil-ask cancel' in (assets/path).read_text(),f'{path} must stop VIGIL Ask'
+assert 'scripts/lib/package-vigil-ask.sh' in (root/'scripts/lib/remix.sh').read_text()
+if shutil.which('rofi'):
+    theme=subprocess.run(['rofi','-theme',ask/'data/vigil-ask.rasi','-dump-theme'],capture_output=True,text=True,timeout=20)
+    assert 'Failed to parse' not in theme.stderr and 'accent' in (ask/'data/vigil-ask.rasi').read_text(),theme.stderr
+result=subprocess.run([sys.executable,'-B',ask/'tests/test_vigil_ask.py'],capture_output=True,text=True,timeout=180)
+assert result.returncode==0,'VIGIL Ask tests failed:\n'+result.stderr[-4000:]
+print('PASS: VIGIL Ask keeps Claude Code optional, its repository off and pinned, Quick Ask without tools, settings or MCP, and its i3 keys, bar and lock stop')
+
 for path in (root/'scripts').rglob('*'):
     if path.is_file() and path.suffix in ['.sh','.py']:
         for ref in re.findall(r'scripts/([\w./-]+\.(?:sh|py))',path.read_text()):
             assert (root/'scripts'/ref).is_file(),f'Broken helper reference {path}: {ref}'
 print('PASS: active script references; all checks passed')
 
-for name in ['build-i3-lock.sh','build-guest.sh','remix.sh','install-i3.sh','install-default-apps.sh','package-branding.sh','package-release-common.sh','package-wallpaper-compat.sh','package-vpm.sh','pack-prepared-root.sh','finish-prepared-image.sh','prepare-brand-assets.sh']:
+for name in ['build-i3-lock.sh','build-guest.sh','remix.sh','install-i3.sh','install-default-apps.sh','package-branding.sh','package-release-common.sh','package-wallpaper-compat.sh','package-vpm.sh','package-vigil-ask.sh','pack-prepared-root.sh','finish-prepared-image.sh','prepare-brand-assets.sh']:
     result=subprocess.run(['bash',root/'scripts/lib'/name],env={**os.environ,'VIGIL_BUILD_GUEST':'0'},capture_output=True,text=True,timeout=10)
     assert result.returncode!=0 and 'approved disposable builder' in result.stderr, f'Broken host guard/helper path: {name}: {result.stderr}'
 print('PASS: every internal build entry refuses host execution through its real guard')

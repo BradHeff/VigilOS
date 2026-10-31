@@ -177,7 +177,7 @@ print('CHECKOUT_LOCK_REFUSAL_PASS')
     def test_actual_source_iso_contains_allocated_metadata(self):
         release,run=self.reserve()
         self.configure(build_number=3,next_version_number=0,codename='Later Manual Edit')
-        for name in ['scripts','branding','Skel','PLASMA-CONFIGS','kickstarts','LICENSES']:
+        for name in ['scripts','branding','Skel','PLASMA-CONFIGS','kickstarts','vigil-ask','LICENSES']:
             path=self.repo/name;path.mkdir();(path/'fixture.txt').write_text(name)
         (self.repo/'LICENSE').write_text('test fixture')
         (self.repo/'README.md').write_text('Wallpaper credit: https://www.deviantart.com/byrotek')
@@ -192,6 +192,9 @@ print('CHECKOUT_LOCK_REFUSAL_PASS')
         readme=self.base/'extracted-README.md'
         subprocess.run(['xorriso','-osirrox','on','-indev',str(work/'source.iso'),'-extract','/README.md',str(readme)],check=True,capture_output=True,timeout=15)
         self.assertEqual(readme.read_text(),(self.repo/'README.md').read_text())
+        ask=self.base/'extracted-vigil-ask.txt'
+        subprocess.run(['xorriso','-osirrox','on','-indev',str(work/'source.iso'),'-extract','/vigil-ask/fixture.txt',str(ask)],check=True,capture_output=True,timeout=15)
+        self.assertEqual(ask.read_text(),'vigil-ask')
         self.assertEqual(load_config(self.config)['build_number'],3)
 
     def test_invalid_configuration_and_snapshot_rejected(self):

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>VIGIL OS</vendor>
+  <action id="org.vigilos.ask.install-claude-code">
+    <description>Install Claude Code for VIGIL Ask</description>
+    <message>Authentication is required to install Claude Code from Anthropic's signed repository</message>
+    <icon_name>org.vigilos.Ask</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/vigil-ask/install-claude-code</annotate>
+  </action>
+</policyconfig>

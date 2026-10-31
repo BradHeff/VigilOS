@@ -1,0 +1,28 @@
+* {
+  bg: #1e1e1e;
+  fg: #dedede;
+  dim: #7a7a7a;
+  accent: #1763ef;
+  selected: #282a36;
+  background-color: transparent;
+  text-color: @fg;
+  font: "Iosevka Nerd Font 12";
+}
+window {
+  location: center;
+  anchor: center;
+  width: 44em;
+  padding: 14px;
+  background-color: @bg;
+  border: 2px;
+  border-color: @accent;
+  border-radius: 6px;
+}
+mainbox { children: [ inputbar, listview ]; spacing: 10px; }
+inputbar { children: [ prompt, entry ]; spacing: 10px; }
+prompt { text-color: @accent; }
+entry { placeholder-color: @dim; cursor: text; }
+listview { lines: 8; fixed-height: false; scrollbar: false; }
+element { padding: 6px 8px; border-radius: 4px; }
+element selected.normal { background-color: @selected; }
+element-text { text-color: inherit; }

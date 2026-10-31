@@ -1238,6 +1238,7 @@ if [[ "$DESKTOP" == i3 ]]; then
 fi
 printf "%s\n" "$DESKTOP" | sudo tee "$ROOTFS_DIR/etc/vigilos-desktop" >/dev/null
 sudo env VIGIL_BUILD_GUEST=1 bash "$BUILD_DIR/scripts/lib/package-vpm.sh" "$ROOTFS_DIR" "$WORK_DIR"
+sudo env VIGIL_BUILD_GUEST=1 bash "$BUILD_DIR/scripts/lib/package-vigil-ask.sh" "$ROOTFS_DIR" "$WORK_DIR"
 sudo env VIGIL_BUILD_GUEST=1 VIGIL_DESKTOP="$DESKTOP" bash "$BUILD_DIR/scripts/lib/package-branding.sh" "$ROOTFS_DIR" "$WORK_DIR"
 
 echo ""
