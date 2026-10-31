@@ -66,6 +66,10 @@ The script boots the same verified Fedora 44 Cloud image the builds use, and bui
 
 SIERRA desktop integration is planned: a search field in Plasma, a Rofi prompt in i3, and a task window shared by both. The first version would handle conversation, selected files and a few tested application actions, each with explicit permission. General GUI automation would stay experimental. None of this is implemented yet.
 
+## Credits
+
+The desktop wallpaper is a painting by [byrotek](https://www.deviantart.com/byrotek), used in VIGIL OS. You can find more of his artwork on [his DeviantArt profile](https://www.deviantart.com/byrotek). The painting isn't covered by the VIGIL licence, and this credit must stay with it.
+
 ## Licence
 
 VIGIL-owned original material is available under the [VIGIL Personal Build Licence](LICENSE). It permits cloning and building an unmodified copy for personal use, with the documented build and version settings. It requires the branding to remain intact and prohibits commercial redistribution, modification and reuse of covered material in other projects.
