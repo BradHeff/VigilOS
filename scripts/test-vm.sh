@@ -74,5 +74,6 @@ qemu-system-x86_64 \
     -drive "file=$DISK,if=virtio,format=qcow2" "${MEDIA[@]}" "${NETWORK[@]}" \
     -device qemu-xhci -device usb-tablet -vga none -device "virtio-vga,xres=$DISPLAY_WIDTH,yres=$DISPLAY_HEIGHT" -display none -vnc "unix:$VM_ROOT/$NAME-vnc.sock" \
     -qmp "unix:$VM_ROOT/$NAME-qmp.sock,server=on,wait=off" \
+    -audiodev driver=none,id=audio0 -device ich9-intel-hda -device hda-duplex,audiodev=audio0 \
     -chardev "socket,id=serial0,path=$VM_ROOT/$NAME-serial.sock,server=on,wait=off,logfile=$EVIDENCE/serial.log" -serial chardev:serial0 -monitor none \
     2>"$EVIDENCE/qemu.log"

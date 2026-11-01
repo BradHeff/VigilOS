@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Service
+MimeType=text/plain;
+Actions=ask;
+X-KDE-Protocols=file
+
+[Desktop Action ask]
+Name=Ask VIGIL about this file
+Icon=org.vigilos.Ask
+Exec=vigil-ask window --file %F

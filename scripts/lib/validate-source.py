@@ -124,21 +124,18 @@ if shutil.which('i3'):
         subprocess.run(['i3','-C','-c',config],check=True,env={**os.environ,'XDG_RUNTIME_DIR':runtime})
 print('PASS: clean portable i3 defaults, terminal imports and prompt')
 ask=root/'vigil-ask'
-key=root/'branding/repos/pki/claude-code.asc'
-assert hashlib.sha256(key.read_bytes()).hexdigest()=='bd70a5e4a268002704024ceba7f8446024114e94f3f0bdd11c23a9e592be81c6','Claude Code key changed'
-if shutil.which('gpg'):
-    with tempfile.TemporaryDirectory(prefix='vigil-key-') as keyhome:
-        shown=subprocess.run(['gpg','--homedir',keyhome,'--batch','--show-keys','--with-colons',key],capture_output=True,text=True,check=True).stdout
-    assert 'fpr:::::::::31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE:' in shown,'Claude Code key fingerprint differs'
-repo_cfg=configparser.ConfigParser(interpolation=None);repo_cfg.read(root/'branding/repos/claude-code.repo');claude_repo=repo_cfg['claude-code']
-assert (claude_repo['enabled'],claude_repo['gpgcheck'],claude_repo['repo_gpgcheck'],claude_repo['sslverify'])==('0','1','1','1'),'Claude Code repository must ship off with signature checks'
-assert claude_repo['gpgkey']=='file:///etc/pki/rpm-gpg/RPM-GPG-KEY-claude-code'
-assert claude_repo['baseurl'].startswith('https://downloads.claude.ai/claude-code/rpm/') and '$' not in claude_repo['baseurl']
 spec=(ask/'vigil-ask.spec').read_text()
-assert not any(line.startswith('Requires:') and 'claude' in line for line in spec.splitlines()),'VIGIL Ask must work without Claude Code installed'
-assert '%config(noreplace) %{_sysconfdir}/yum.repos.d/claude-code.repo' in spec
+shipped=[p for p in [ask/'vigil-ask',ask/'vigil-ask.spec',*(ask/'vigil_ask').glob('*.py'),*(ask/'data').iterdir(),*(ask/'system').iterdir()] if p.is_file()]
+assert not [p for p in shipped if re.search(r'claude|anthropic',p.read_text(),re.I)],'VIGIL Ask must not ship Claude Code parts'
+assert not list((root/'branding/repos').rglob('*claude*')),'No Claude Code repository or key ships'
+glm=(ask/'vigil_ask/vigil_glm.py').read_text()
+assert "ORIGIN = 'https://chat.vigilglm.ai'" in glm and "LOOPBACK = ('127.0.0.1', 'localhost', '::1')" in glm,'Tokens go only to chat.vigilglm.ai or a local test server'
+assert "'webSearch': False, 'imageTool': False, 'browserTool': False" in glm,'Quick Ask asks without tools'
+assert 'api_key' not in glm.lower() and 'vig_' not in glm,'VIGIL Ask signs in to the account; it never takes an API key'
+sign=(ask/'vigil_ask/signin.py').read_text()
+assert "CLIENT_ID = 'vigilos-ask'" in glm and "'Authorization'" in glm and 'WebEngine' not in sign and 'vigil_glm.Connect()' in sign,'VIGIL Ask signs in with a code approved in the browser and never sees a password'
 if shutil.which('desktop-file-validate'):
-    for entry in ['org.vigilos.Ask.desktop','vigil-ask-sendto.desktop']:subprocess.run(['desktop-file-validate',ask/'system'/entry],check=True)
+    for entry in ['org.vigilos.Ask.desktop','vigil-ask-sendto.desktop','vigil-ask-krunner.desktop']:subprocess.run(['desktop-file-validate',ask/'system'/entry],check=True)
 i3_text=(assets/'skel/.config/i3/config').read_text()
 assert not re.search(r'^\s*set\s+\$\S+\s+.*\$',i3_text,re.M),'i3 does not expand a variable inside another variable'
 for value in ['bindsym $mod+Shift+a exec --no-startup-id vigil-ask prompt','bindsym $mod+Ctrl+a exec --no-startup-id vigil-ask window --selection','for_window [class="vigil-ask-window"] floating enable']:
@@ -147,12 +144,26 @@ bar_cfg=configparser.ConfigParser(interpolation=None,strict=False);bar_cfg.read_
 assert bar_cfg['module/vigil-ask']['exec']=='vigil-ask status --follow --polybar' and 'vigil-ask' in bar_cfg['bar/main']['modules-right'].split()
 for path in ['bin/lock','bin/vigil-i3-run']:assert 'vigil-ask cancel' in (assets/path).read_text(),f'{path} must stop VIGIL Ask'
 assert 'scripts/lib/package-vigil-ask.sh' in (root/'scripts/lib/remix.sh').read_text()
+def ask_entry(name):
+    entry=configparser.ConfigParser(interpolation=None,strict=False);entry.optionxform=str;entry.read(ask/'system'/name);return entry
+app=ask_entry('org.vigilos.Ask.desktop')
+assert (app['Desktop Entry']['X-KDE-Shortcuts'],app['Desktop Action selection']['X-KDE-Shortcuts'])==('Meta+Alt+A','Meta+Alt+Shift+A'),'Plasma shortcuts changed'
+runner=ask_entry('vigil-ask-krunner.desktop')['Desktop Entry'];activation=ask_entry('org.vigilos.Ask.KRunner.service')['D-BUS Service']
+runner_code=(ask/'vigil_ask/krunner.py').read_text()
+assert runner['X-Plasma-API']=='DBus2' and runner['X-Plasma-DBusRunner-Service']==activation['Name']=='org.vigilos.Ask.KRunner'
+assert f"NAME = '{activation['Name']}'" in runner_code and f"PATH = '{runner['X-Plasma-DBusRunner-Path']}'" in runner_code and activation['Exec']=='/usr/bin/vigil-ask krunner'
+menu=ask_entry('vigil-ask-dolphin.desktop')
+assert (menu['Desktop Entry']['Type'],menu['Desktop Entry']['MimeType'],menu['Desktop Entry']['X-KDE-Protocols'])==('Service','text/plain;','file')
+assert all(menu[f'Desktop Action {name}']['Exec']=='vigil-ask window --file %F' for name in menu['Desktop Entry']['Actions'].strip(';').split(';'))
+for installed in ['%{_datadir}/krunner/dbusplugins/org.vigilos.Ask.desktop','%{_datadir}/dbus-1/services/org.vigilos.Ask.KRunner.service',
+                  '%{_datadir}/kio/servicemenus/org.vigilos.Ask.desktop']:
+    assert installed in spec,installed
 if shutil.which('rofi'):
     theme=subprocess.run(['rofi','-theme',ask/'data/vigil-ask.rasi','-dump-theme'],capture_output=True,text=True,timeout=20)
     assert 'Failed to parse' not in theme.stderr and 'accent' in (ask/'data/vigil-ask.rasi').read_text(),theme.stderr
 result=subprocess.run([sys.executable,'-B',ask/'tests/test_vigil_ask.py'],capture_output=True,text=True,timeout=180)
 assert result.returncode==0,'VIGIL Ask tests failed:\n'+result.stderr[-4000:]
-print('PASS: VIGIL Ask keeps Claude Code optional, its repository off and pinned, Quick Ask without tools, settings or MCP, and its i3 keys, bar and lock stop')
+print('PASS: VIGIL Ask connects to VIGIL GLM accounts only through browser-approved sign-in on chat.vigilglm.ai, asks without tools, ships no Claude Code parts, and keeps its i3 keys, bar and lock stop, and its Plasma shortcuts, KRunner runner and Dolphin menu')
 
 for path in (root/'scripts').rglob('*'):
     if path.is_file() and path.suffix in ['.sh','.py']:

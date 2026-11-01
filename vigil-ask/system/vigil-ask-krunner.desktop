@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Service
+Name=VIGIL Ask
+Comment=Type "ask" and a question. Answered by VIGIL GLM, in the cloud.
+Icon=org.vigilos.Ask
+X-KDE-PluginInfo-Name=org.vigilos.Ask
+X-KDE-PluginInfo-EnabledByDefault=true
+X-Plasma-API=DBus2
+X-Plasma-DBusRunner-Service=org.vigilos.Ask.KRunner
+X-Plasma-DBusRunner-Path=/runner
+X-Plasma-Request-Actions-Once=true
+X-Plasma-Runner-Syntaxes=ask :q:
+X-Plasma-Runner-Syntax-Descriptions=Asks :q: in VIGIL Ask, which sends it to VIGIL GLM

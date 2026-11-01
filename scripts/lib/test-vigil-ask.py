@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Test VIGIL Ask in a disposable Fedora 44 VM: build and install its RPM, run the tests with PySide6, drive the i3 keys,
-Rofi and Polybar on a virtual X display, install Claude Code from Anthropic's repository and check setup while signed
-out. Nothing is installed on this host."""
+"""Test VIGIL Ask in a disposable Fedora 44 VM: build and install its RPM, run the tests with PySide6 and Qt WebEngine
+against a fake VIGIL GLM server, drive the i3 keys, Rofi and Polybar on a virtual X display, drive a Plasma Wayland
+session nested through Weston on an accelerated virtual GPU (shortcuts, KRunner, Dolphin, lock and logout), then check signed-out setup against the
+real chat.vigilglm.ai without an account. Requires an existing usable EGL render node
+(VIGIL_TEST_RENDER_NODE, default /dev/dri/renderD128). Nothing is installed on this host."""
 from __future__ import annotations
 import argparse, datetime, json, os, shutil, subprocess, sys, time
 from pathlib import Path
 sys.dont_write_bytecode = True
 from build import REPO, free_port, log, run, ssh_args, verify_inputs
 
-PHASES = ['package', 'unit', 'i3', 'install', 'signedout', 'system']
+PHASES = ['package', 'unit', 'i3', 'plasma', 'live', 'system']
 BOOTSTRAP = '''#!/bin/bash
 set -euo pipefail
 exec > >(tee /ask-bootstrap.log /dev/ttyS0) 2>&1
@@ -18,7 +20,10 @@ mkdir -p /mnt/ask-media /ask-test
 mount -o ro /dev/disk/by-label/ASK_TEST /mnt/ask-media
 cp -a /mnt/ask-media/. /ask-test/
 umount /mnt/ask-media
-dnf -y install rpm-build python3-pyside6 xdg-utils libnotify polkit desktop-file-utils dejavu-sans-fonts
+dnf -y install rpm-build python3-pyside6 python3-gobject-base dbus-daemon xdg-utils libnotify polkit desktop-file-utils dejavu-sans-fonts
+dnf -y install kernel-modules-$(uname -r)
+modprobe virtio_gpu
+modprobe snd_hda_intel
 touch /ask-test/ready
 echo ASK_TEST_READY
 '''
@@ -31,11 +36,12 @@ def stage(media):
     sources = media / 'SOURCES'
     shutil.copytree(REPO / 'vigil-ask', sources / 'vigil-ask', ignore=shutil.ignore_patterns('__pycache__', '*.pyc', 'tests'))
     shutil.copy2(REPO / 'branding/logos/source/vigil-mark.svg', sources / 'org.vigilos.Ask.svg')
-    shutil.copy2(REPO / 'branding/repos/claude-code.repo', sources)
-    shutil.copy2(REPO / 'branding/repos/pki/claude-code.asc', sources)
     shutil.copy2(REPO / 'vigil-ask/vigil-ask.spec', media)
     for name in ('i3', 'polybar', 'rofi'):
         shutil.copytree(REPO / 'branding/i3/skel/.config' / name, media / 'i3/config' / name)
+    shutil.copytree(REPO / 'branding/i3/bin', media / 'i3/bin')
+    remix = (REPO / 'scripts/lib/remix.sh').read_text()
+    (media / 'i3/vigilos-is-live').write_text(remix.split("<< 'IS_LIVE_EOF'\n", 1)[1].split('\nIS_LIVE_EOF', 1)[0] + '\n')
     shutil.copytree(REPO / 'branding/i3/fonts', media / 'i3/fonts', ignore=shutil.ignore_patterns('*LICENSE*'))
 
 
@@ -43,7 +49,7 @@ def make_seed(work, public_key):
     userdata = '''#cloud-config
 users:
   - name: builder
-    groups: [wheel]
+    groups: [wheel, video, render]
     shell: /bin/bash
     lock_passwd: true
     sudo: ["ALL=(ALL) NOPASSWD:ALL"]
@@ -66,8 +72,13 @@ runcmd:
 
 def boot(work):
     port = free_port()
+    render_node = os.environ.get('VIGIL_TEST_RENDER_NODE', '/dev/dri/renderD128')
+    if not os.access(render_node, os.R_OK | os.W_OK):
+        raise RuntimeError(f'Existing usable render node required for nested Plasma: {render_node}')
     argv = ['qemu-system-x86_64', '-name', 'vigil-ask-test', '-machine', 'q35', '-accel', 'kvm', '-cpu', 'host',
-            '-m', '4096', '-smp', '2', '-display', 'none', '-monitor', 'none',
+            '-m', '4096', '-smp', '2', '-display', f'egl-headless,rendernode={render_node}', '-monitor', 'none',
+            '-vga', 'none', '-device', 'virtio-vga-gl',
+            '-audiodev', 'driver=none,id=audio0', '-device', 'ich9-intel-hda', '-device', 'hda-duplex,audiodev=audio0',
             '-drive', f'file={work / "disk.qcow2"},if=virtio,format=qcow2',
             '-drive', f'file={work / "seed.iso"},media=cdrom,readonly=on,format=raw',
             '-drive', f'file={work / "ask-test.iso"},media=cdrom,readonly=on,format=raw',
@@ -148,8 +159,10 @@ def main():
         result['guest'] = facts.stdout.split()
         for phase in PHASES:
             log(f'Phase: {phase}')
-            guest(ssh, f'bash /ask-test/source/vigil-ask/tests/vm-checks.sh {phase}', work, checks)
-        result['claude_code'] = guest(ssh, 'rpm -q claude-code', work, []).stdout.strip()
+            before = len(checks)
+            phase_result = guest(ssh, f'bash /ask-test/source/vigil-ask/tests/vm-checks.sh {phase}', work, checks)
+            if phase_result.returncode or len(checks) == before:
+                checks.append(f'FAIL: {phase} phase exited {phase_result.returncode} or emitted no checks')
         fetch(ssh, work)
     except BaseException as exc:
         result.update(status='error', error=str(exc))

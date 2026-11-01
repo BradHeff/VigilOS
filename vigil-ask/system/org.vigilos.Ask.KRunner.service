@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=org.vigilos.Ask.KRunner
+Exec=/usr/bin/vigil-ask krunner

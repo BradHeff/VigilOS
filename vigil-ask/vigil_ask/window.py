@@ -1,26 +1,19 @@
 """The VIGIL Ask window, shared by the Plasma and i3 editions."""
 from __future__ import annotations
-import json, queue, subprocess, threading
+import html, json, os, queue, threading
 from pathlib import Path
-from PySide6.QtCore import QEvent, QProcess, Qt, QTimer, QUrl, Slot, SLOT
+from PySide6.QtCore import Qt, QTimer, Slot, SLOT
 from PySide6.QtGui import QDesktopServices, QGuiApplication, QIcon, QKeySequence, QShortcut
 from PySide6.QtNetwork import QLocalServer
 from PySide6.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QLabel, QPlainTextEdit, QPushButton,
                                QStackedWidget, QTextBrowser, QToolButton, QVBoxLayout, QWidget)
-from . import cli, core, claude_code
+from . import cli, core, vigil_glm
 
-INSTALLER = Path('/usr/libexec/vigil-ask/install-claude-code')
 SETUP_TEXT = {
-    'checking': 'Checking Claude Code…',
     'admin-off': 'VIGIL Ask has been turned off on this computer.',
     'off': 'VIGIL Ask is turned off for your account.',
-    'missing': ("VIGIL Ask uses Claude Code by Anthropic, which isn't installed yet.\n\n"
-                "Claude Code needs a paid Claude plan or a Claude Console account. "
-                "The free Claude plan doesn't include it.\n\nInstalling turns on Anthropic's signed package repository, "
-                "so Claude Code then updates with your other system updates."),
-    'old': 'Claude Code {detail} is older than VIGIL Ask needs ({minimum} or newer). Install your system updates, then check again.',
-    'signin': ('Sign in to Claude Code with your Claude account. A terminal opens for the sign-in; '
-               'come back to this window when it has finished.'),
+    'signin': ("Sign in with your VIGIL GLM account in your browser, where you can also create a free account. "
+               "Questions use the account's credits, within its plan's limits."),
 }
 
 
@@ -63,9 +56,10 @@ class Window(QWidget):
         self.lock = lock
         self.run = None
         self.turns, self.items = [], []
-        self.session_id = self.entry_id = None
-        self.state, self.pending_submit = 'checking', False
-        self.setup_results = queue.Queue()
+        self.entry_id = self.signin = None
+        self.state, self.pending_submit = 'signin', False
+        self.session_identity = None
+        self.jobs, self.pending = queue.Queue(), 0
         self.dirty = False
         self.setWindowTitle('VIGIL Ask')
         self.setWindowIcon(QIcon.fromTheme('org.vigilos.Ask', QIcon.fromTheme('vigilos-logo')))
@@ -84,9 +78,10 @@ class Window(QWidget):
         layout = QVBoxLayout(self)
         header = QHBoxLayout()
         title = QLabel('<b>VIGIL Ask</b>')
-        badge = QLabel('Cloud: Anthropic')
+        badge = QLabel('Cloud: VIGIL GLM')
         badge.setStyleSheet('border: 1px solid #1763ef; border-radius: 4px; padding: 1px 6px;')
-        badge.setToolTip('Your question and anything you attach are sent to Anthropic under your Claude account.')
+        badge.setToolTip('Your question and anything you attach are sent to VIGIL GLM, under your VIGIL GLM account, '
+                         'and answered by GLM models from Z.ai.')
         header.addWidget(title)
         header.addStretch()
         header.addWidget(badge)
@@ -122,11 +117,13 @@ class Window(QWidget):
         entry.addWidget(self.ask_button)
         layout.addLayout(entry)
         footer = QHBoxLayout()
-        self.status = QLabel(wordWrap=True)
-        credit = QLabel('Uses Claude Code by Anthropic')
-        credit.setEnabled(False)
+        self.status = QLabel(wordWrap=True, textFormat=Qt.TextFormat.PlainText)
+        self.account = QLabel(openExternalLinks=True, textFormat=Qt.TextFormat.RichText)
+        self.signout_button = QToolButton(text='Sign out', toolTip='Disconnect this computer from your VIGIL GLM account')
+        self.signout_button.clicked.connect(self.sign_out)
         footer.addWidget(self.status, 1)
-        footer.addWidget(credit)
+        footer.addWidget(self.account)
+        footer.addWidget(self.signout_button)
         layout.addLayout(footer)
         actions = QHBoxLayout()
         self.stop_button = QPushButton('Stop', enabled=False)
@@ -135,13 +132,9 @@ class Window(QWidget):
         self.copy_button.clicked.connect(self.copy_answer)
         self.new_button = QPushButton('New question')
         self.new_button.clicked.connect(self.new_conversation)
-        self.escalate_button = QPushButton('Open in Claude Code')
-        self.escalate_button.setToolTip('Choose a folder and continue in an interactive Claude Code session')
-        self.escalate_button.clicked.connect(self.escalate)
         for button in (self.stop_button, self.copy_button, self.new_button):
             actions.addWidget(button)
         actions.addStretch()
-        actions.addWidget(self.escalate_button)
         layout.addLayout(actions)
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.close)
         screen = QGuiApplication.screenAt(self.cursor().pos()) or QGuiApplication.primaryScreen()
@@ -182,20 +175,30 @@ class Window(QWidget):
             sock.disconnected.connect(sock.deleteLater)
 
     def apply(self, request):
+        if request.get('action') == 'signout':
+            self.sign_out()
+            return
         if request.get('action') == 'cancel':
             self.stop()
             return
+        if request.get('action') == 'check':
+            self.check_setup()
+            return
         self.show()
         self.raise_()
+        token = request.get('activation_token')
+        if isinstance(token, str) and token and QGuiApplication.platformName() == 'wayland':
+            os.environ['XDG_ACTIVATION_TOKEN'] = token
         self.activateWindow()
+        os.environ.pop('XDG_ACTIVATION_TOKEN', None)
         busy = self.run is not None
         if not busy and (request.get('history') or request.get('last')):
             entries = sorted(core.load_history(), key=lambda e: e['updated'])
             entry = core.find_history(request['history']) if request.get('history') else (entries[-1] if entries else None)
             if entry:
                 self.new_conversation()
-                self.turns = [{'q': t['q'], 'a': t['a'], 'attached': [], 'state': 'done'} for t in entry['turns']]
-                self.session_id, self.entry_id = entry['session_id'], entry['id']
+                self.turns = [{'q': t['q'], 'sent': t['q'], 'a': t['a'], 'attached': [], 'state': 'done'} for t in entry['turns']]
+                self.entry_id = entry['id']
                 self.render()
         if not busy and (request.get('prompt') or request.get('context')):
             self.new_conversation()
@@ -214,40 +217,48 @@ class Window(QWidget):
         self.maybe_submit()
 
     def check_setup(self):
-        self.state = 'checking'
-        self.show_setup()
-        threading.Thread(target=lambda: self.setup_results.put(core.setup_state()), daemon=True).start()
-        self.timer.start()
-
-    def show_setup(self, detail=''):
+        session = vigil_glm.load_session()
+        if session and self.session_identity and not vigil_glm.same(session, self.session_identity):
+            self.turns, self.entry_id = [], None
+            self.render()
+        if session:
+            self.session_identity = session
+        self.state = core.setup_state()
         ready = self.state == 'ready'
-        if self.state != 'checking':
-            self.pages.setCurrentIndex(0 if ready else 1)
+        self.pages.setCurrentIndex(0 if ready else 1)
         for widget in (self.prompt, self.ask_button, self.attach_button):
-            widget.setEnabled(ready or self.state == 'checking')
-        self.escalate_button.setEnabled(self.state in ('ready', 'notice', 'signin'))
+            widget.setEnabled(ready)
+        session = vigil_glm.load_session()
+        self.signout_button.setVisible(session is not None)
+        self.account.setText(html.escape(session['email']) if session else '')
         empty(self.setup_buttons)
         if ready:
             if self.run is None:
                 core.set_status('idle')
+            self.refresh_usage()
+            self.maybe_submit()
             return
-        minimum = '.'.join(map(str, claude_code.MIN_VERSION))
-        text = cli.notice() if self.state == 'notice' else SETUP_TEXT[self.state].format(detail=detail, minimum=minimum)
-        self.setup_label.setText(text)
+        self.setup_label.setText(cli.notice() if self.state == 'notice' else SETUP_TEXT[self.state])
         buttons = {
             'off': [('Turn on', self.turn_on)],
-            'missing': [('Install Claude Code', self.install), ('Turn off VIGIL Ask', self.turn_off)],
-            'old': [('Check again', self.check_setup)],
             'notice': [('Continue', self.accept_notice), ('Turn off VIGIL Ask', self.turn_off)],
-            'signin': [('Sign in', self.sign_in), ('Check again', self.check_setup)],
+            'signin': [('Sign in', self.sign_in), ('Turn off VIGIL Ask', self.turn_off)],
         }.get(self.state, [])
         for label, action in buttons:
             button = QPushButton(label)
             button.clicked.connect(action)
             self.setup_buttons.addWidget(button)
         self.setup_buttons.addStretch()
-        if self.state not in ('checking', 'admin-off'):
-            core.set_status({'off': 'off', 'missing': 'missing', 'signin': 'signin'}.get(self.state, 'idle'))
+        if self.state != 'admin-off' and self.run is None:
+            core.set_status('off' if self.state == 'off' else 'idle' if session else 'signin')
+
+    def refresh_usage(self):
+        session = vigil_glm.load_session()
+        if not session:
+            return
+        self.pending += 1
+        threading.Thread(target=lambda: self.jobs.put(('usage', session, vigil_glm.usage(session))), daemon=True).start()
+        self.timer.start()
 
     def maybe_submit(self):
         if self.pending_submit and self.state == 'ready' and self.run is None:
@@ -266,29 +277,29 @@ class Window(QWidget):
         core.save_config(notice_accepted=True)
         self.check_setup()
 
-    def install(self):
-        if not INSTALLER.is_file():
-            self.set_message('Install it with: sudo dnf install --enablerepo=claude-code claude-code')
-            return
-        self.set_message('Installing Claude Code…')
-        process = QProcess(self)
-        process.finished.connect(lambda code, _status: (self.set_message('' if code == 0 else 'Claude Code was not installed.'),
-                                                        self.check_setup()))
-        process.start('pkexec', [str(INSTALLER)])
-
     def sign_in(self):
-        claude = core.claude_path()
-        command = core.terminal_command(['bash', '-c', '"$1" auth login; echo; read -rsp "Press Enter to close this window."',
-                                         'vigil-ask', claude])
-        if not command:
-            self.set_message('No terminal was found. Run "claude auth login" in a terminal, then check again.')
-            return
-        subprocess.Popen(command, start_new_session=True, stdin=subprocess.DEVNULL)
+        from . import signin
+        if self.signin is None or not self.signin.isVisible():
+            self.signin = signin.SignIn(self)
+            self.signin.accepted.connect(lambda: (self.set_message('Signed in'), self.check_setup()))
+            self.signin.open()
+        self.signin.raise_()
 
-    def changeEvent(self, event):
-        super().changeEvent(event)
-        if event.type() == QEvent.Type.ActivationChange and self.isActiveWindow() and self.state in ('signin', 'missing', 'old'):
-            self.check_setup()
+    def sign_out(self):
+        if self.signin is not None and self.signin.isVisible():
+            self.signin.reject()
+        self.stop()
+        session = vigil_glm.load_session()
+        vigil_glm.forget()
+        if session:
+            threading.Thread(target=vigil_glm.revoke, args=(session,), daemon=True).start()
+        if self.run is None:
+            self.turns, self.entry_id = [], None
+            self.render()
+        else:
+            self.turns_after_signout = True
+        self.set_message('Signed out')
+        self.check_setup()
 
     def add_item(self, item):
         self.items.append(item)
@@ -314,16 +325,20 @@ class Window(QWidget):
         question = self.prompt.toPlainText().strip()
         if not question or self.run is not None:
             return
-        if self.state != 'ready':
-            self.pending_submit = True
+        if core.setup_state() != 'ready':
+            self.check_setup()
+            self.pending_submit = False
             return
+        self.check_setup()
         try:
             payload = core.compose(question, self.items)
+            messages = vigil_glm.conversation([(t['sent'], t['a']) for t in self.turns if t['state'] == 'done'], payload)
         except core.ContextError as exc:
             self.set_message(str(exc))
             return
-        self.run = claude_code.Run(core.claude_path(), payload, core.load_config()['model'], self.session_id)
-        self.turns.append({'q': question, 'a': '', 'attached': [i['label'] for i in self.items], 'state': 'working'})
+        config = core.load_config()
+        self.run = vigil_glm.Run(messages, config['model'], config['effort'])
+        self.turns.append({'q': question, 'sent': payload, 'a': '', 'attached': [i['label'] for i in self.items], 'items': list(self.items), 'state': 'working'})
         self.prompt.clear()
         self.clear_items()
         self.set_running(True)
@@ -341,46 +356,52 @@ class Window(QWidget):
         self.copy_button.setEnabled(bool(self.turns and self.turns[-1]['a']))
 
     def poll(self):
-        try:
-            self.state, detail = self.setup_results.get_nowait()
-            self.show_setup(detail)
-            self.maybe_submit()
-        except queue.Empty:
-            pass
+        while not self.jobs.empty():
+            _, session, line = self.jobs.get_nowait()
+            self.pending -= 1
+            if not vigil_glm.same(vigil_glm.load_session(), session):
+                continue
+            self.account.setText(html.escape(session['email']) + (f' · <a href="{vigil_glm.USAGE}">{html.escape(line)}</a>' if line else ''))
         while self.run is not None:
             try:
                 kind, value = self.run.events.get_nowait()
             except queue.Empty:
                 break
-            if kind == 'session':
-                self.session_id = value
+            if kind == 'thinking':
+                self.set_message('Thinking…')
             elif kind == 'text':
                 self.turns[-1]['a'] += value
                 self.dirty = True
-            elif kind == 'retry':
+            elif kind == 'replace':
+                self.turns[-1]['a'] = value
+                self.dirty = True
+            elif kind == 'notice':
                 self.set_message(value)
             elif kind == 'end':
                 self.finish(value)
         if self.dirty:
             self.render()
-        if self.run is None and self.setup_results.empty() and self.state != 'checking':
+        if self.run is None and not self.pending:
             self.timer.stop()
 
     def finish(self, outcome):
         self.run = None
         turn = self.turns[-1]
         state = turn['state'] = outcome['state']
-        self.session_id = outcome['session_id'] or self.session_id
         if state == 'done':
-            self.entry_id = core.record_turn(self.session_id, turn['q'], turn['a'], self.entry_id)
+            self.entry_id = core.record_turn(turn['q'], turn['a'], self.entry_id)
             self.set_message('Done')
+            self.refresh_usage()
             if not self.isActiveWindow():
                 core.notify('Answer ready')
         elif state == 'signin':
             self.turns.pop()
-            self.prompt.setPlainText(turn['q'])
-            self.state = 'signin'
-            self.show_setup()
+            if not self.prompt.toPlainText().strip():
+                self.prompt.setPlainText(turn['q'])
+            for item in turn.get('items', []):
+                self.add_item(item)
+            self.set_message('Your VIGIL GLM sign-in has ended. Sign in again to ask.')
+            self.check_setup()
         elif state == 'stopped':
             self.set_message('Stopped')
         else:
@@ -388,6 +409,10 @@ class Window(QWidget):
         if state != 'signin':
             core.set_status(state)
         self.set_running(False)
+        if getattr(self, 'turns_after_signout', False):
+            self.turns, self.entry_id = [], None
+            self.turns_after_signout = False
+            self.check_setup()
         self.render()
 
     def render(self):
@@ -421,7 +446,7 @@ class Window(QWidget):
     def new_conversation(self):
         if self.run is not None:
             return
-        self.turns, self.session_id, self.entry_id = [], None, None
+        self.turns, self.entry_id = [], None
         self.clear_items()
         self.render()
         self.set_running(False)
@@ -429,38 +454,17 @@ class Window(QWidget):
         if self.state == 'ready':
             core.set_status('idle')
 
-    def escalate(self):
-        question = self.prompt.toPlainText().strip() or (self.turns[-1]['q'] if self.turns else '')
-        folder = QFileDialog.getExistingDirectory(self, 'Open Claude Code in this folder', str(Path.home()))
-        if not folder:
-            return
-        if claude_code.link_handler_registered():
-            QDesktopServices.openUrl(QUrl.fromEncoded(claude_code.deep_link(folder, question).encode()))
-            self.set_message('Claude Code opened with your question typed in. Read it, then press Enter to send it.')
-            return
-        claude = core.claude_path()
-        command = core.terminal_command([claude], folder) if claude else None
-        if not command:
-            self.set_message('Claude Code or a terminal is missing.')
-            return
-        if question:
-            QGuiApplication.clipboard().setText(question)
-        subprocess.Popen(command, cwd=folder, start_new_session=True, stdin=subprocess.DEVNULL)
-        self.set_message('Claude Code opened in a terminal.' + (' Your question is on the clipboard to paste.' if question else ''))
-
     def closeEvent(self, event):
         if self.run is not None:
             self.run.cancel()
-            try:
-                self.run.process.wait(timeout=6)
-            except subprocess.TimeoutExpired:
-                pass
+            self.run.wait(6)
         self.server.close()
         core.clear_status()
         super().closeEvent(event)
 
 
 def main(request, lock):
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     app = QApplication(['vigil-ask-window'])
     app.setApplicationName('vigil-ask-window')
     app.setApplicationDisplayName('VIGIL Ask')
