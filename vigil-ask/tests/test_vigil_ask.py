@@ -713,6 +713,31 @@ class WindowSmoke(Base):
         w.close()
         self.assertFalse((core.runtime_dir() / 'status.json').exists())
 
+    def test_close_releases_qt_objects_before_a_usage_worker_finishes(self):
+        from PySide6.QtCore import QCoreApplication, QEvent
+        from shiboken6 import isValid
+        started, release, finished = threading.Event(), threading.Event(), threading.Event()
+
+        def delayed_usage(session):
+            started.set()
+            release.wait(10)
+            finished.set()
+            return 'late usage'
+
+        self.ready()
+        with patch.object(vigil_glm, 'usage', side_effect=delayed_usage):
+            w = self.open()
+            try:
+                self.until(started.is_set)
+                lock = w.lock
+                w.close()
+                QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+                self.assertFalse(isValid(w), 'Qt objects must be destroyed on the GUI thread at close')
+                self.assertTrue(lock.closed, 'the window must release its lock file')
+            finally:
+                release.set()
+                self.until(finished.is_set)
+
     def test_disable_is_rechecked_before_sending(self):
         self.ready()
         w = self.open()

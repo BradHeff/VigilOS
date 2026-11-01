@@ -3,7 +3,7 @@ from __future__ import annotations
 import json, os, shutil, signal, subprocess, tempfile, threading, time
 from pathlib import Path
 
-VERSION = '0.3.0'
+VERSION = '0.3.1'
 DATA = Path(__file__).resolve().parent.parent / 'data'
 ADMIN_OFF = Path('/etc/vigil-ask/disabled')
 DEFAULTS = {'enabled': True, 'history_days': 30, 'model': None, 'effort': None, 'notice_accepted': False}

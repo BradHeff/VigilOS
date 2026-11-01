@@ -53,6 +53,7 @@ class Prompt(QPlainTextEdit):
 class Window(QWidget):
     def __init__(self, lock):
         super().__init__()
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.lock = lock
         self.run = None
         self.turns, self.items = [], []
@@ -257,7 +258,8 @@ class Window(QWidget):
         if not session:
             return
         self.pending += 1
-        threading.Thread(target=lambda: self.jobs.put(('usage', session, vigil_glm.usage(session))), daemon=True).start()
+        jobs = self.jobs
+        threading.Thread(target=lambda: jobs.put(('usage', session, vigil_glm.usage(session))), daemon=True).start()
         self.timer.start()
 
     def maybe_submit(self):
@@ -455,10 +457,14 @@ class Window(QWidget):
             core.set_status('idle')
 
     def closeEvent(self, event):
+        self.timer.stop()
+        if self.signin is not None:
+            self.signin.reject()
         if self.run is not None:
             self.run.cancel()
             self.run.wait(6)
         self.server.close()
+        self.lock.close()
         core.clear_status()
         super().closeEvent(event)
 

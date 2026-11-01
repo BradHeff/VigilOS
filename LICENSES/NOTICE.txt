@@ -21,3 +21,5 @@ Fedora packages, repositories, keys, signed boot components and their
 licences retain upstream provenance. Runtime RPM licensing metadata must
 identify the applicable licences, and public binary distribution must meet
 each component licence, including corresponding-source obligations.
+
+SDDM keyboard loader compatibility (2026-11-01): VirtualKeyboardLoader.qml and VirtualKeyboard_wayland.qml in both VIGIL SDDM theme copies are preserved from KDE plasma-workspace v6.7.5, lookandfeel/components/. Source: https://invent.kde.org/plasma/plasma-workspace/-/tree/v6.7.5/lookandfeel/components . Upstream authors and SPDX notices remain in each file. VirtualKeyboardLoader.qml is LGPL-2.0-or-later; VirtualKeyboard_wayland.qml offers LGPL-2.1-only OR LGPL-3.0-only OR LicenseRef-KDE-Accepted-LGPL. These copies are distributed under the LGPL version 3 option; see LGPL-3.0-only.txt and GPL-3.0-only.txt. The loader is bundled because Plasma 6.8 removed its private Breeze export.

@@ -1,5 +1,5 @@
 Name: vigil-ask
-Version: 0.3.0
+Version: 0.3.1
 Release: 1%{?dist}
 Summary: Quick questions from the VIGIL OS desktop, answered by VIGIL GLM
 License: LicenseRef-VIGIL-Personal-Build

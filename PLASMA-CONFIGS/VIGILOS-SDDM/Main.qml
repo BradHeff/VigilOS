@@ -30,6 +30,7 @@ import org.kde.kirigami 2.20 as Kirigami
 import org.kde.breeze.components
 
 import "components"
+import "components" as VigilComponents
 
 Item {
     id: root
@@ -198,13 +199,13 @@ Item {
 
             Behavior on opacity {
                 OpacityAnimator {
-                    duration: units.longDuration
+                    duration: Kirigami.Units.longDuration
                 }
             }
         }
 
-        // IMported from org.kde.breeze.components
-        VirtualKeyboardLoader {
+        // Keep this theme independent of private Breeze QML exports.
+        VigilComponents.VirtualKeyboardLoader {
             id: inputPanel
             z: 1
             screenRoot: root
@@ -299,12 +300,12 @@ Item {
             anchors {
                 bottom: parent.bottom
                 left: parent.left
-                margins: units.smallSpacing
+                margins: Kirigami.Units.smallSpacing
             }
 
             Behavior on opacity {
                 OpacityAnimator {
-                    duration: units.longDuration
+                    duration: Kirigami.Units.longDuration
                 }
             }
 
@@ -342,7 +343,7 @@ Item {
 
             Behavior on opacity {
                 OpacityAnimator {
-                    duration: units.longDuration
+                    duration: Kirigami.Units.longDuration
                 }
             }
 

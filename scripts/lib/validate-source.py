@@ -66,6 +66,12 @@ for folder in ['PLASMA-CONFIGS/VIGILOS-SDDM','branding/sddm/vigilos']:
         a,b=sorted([lightness(foreground),lightness(background)])
         assert (b+.05)/(a+.05)>=4.5,(folder,foreground,background)
     assert 'Image.PreserveAspectFit' in (root/folder/'Main.qml').read_text()
+    main=(root/folder/'Main.qml').read_text()
+    assert 'VigilComponents.VirtualKeyboardLoader {' in main, 'Use the bundled keyboard loader, not private Breeze exports'
+    for qml in ['Main.qml','Login.qml']:
+        assert not re.search(r'\bunits\.', (root/folder/qml).read_text()), 'Use explicit Kirigami.Units on current Plasma'
+    for component in ['VirtualKeyboardLoader.qml','VirtualKeyboard.qml','VirtualKeyboard_wayland.qml']:
+        assert (root/folder/'components'/component).is_file(), (folder,component)
 defaults=(root/'branding/desktop-defaults/defaults').read_text()
 for value in ['ColorScheme=VIGILDark','name=PurPurNight-Plasma','Theme=VIGIL-Dark-Splash']:
     assert value in defaults,value
