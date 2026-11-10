@@ -10,7 +10,9 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
-    container: registry.fedoraproject.org/fedora:44
+    container:
+      image: registry.fedoraproject.org/fedora:44
+      options: --init
     steps:
       - name: Install check tools
         run: >-
