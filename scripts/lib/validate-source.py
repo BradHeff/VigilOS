@@ -20,6 +20,14 @@ if (root/'release.json').exists():
     assert version_config['build_number']==release.build_number and version_config['codename']==release.codename
     assert version_config['next_version_number']==release.version_number+1
 print(f'PASS: shell syntax, Python AST and version metadata ({release.version}, {release.codename})')
+if shutil.which('shellcheck'):
+    shell=re.compile(rb'#!\S*(/env )?\S*\b(ba)?sh\b')
+    scripts=sorted(p.relative_to(root) for p in [*(root/'scripts').rglob('*'),*(root/'branding/i3').rglob('*'),*(root/'vigil-ask').rglob('*')]
+                   if p.is_file() and not p.is_symlink() and 'appearance' not in p.parts and (p.suffix=='.sh' or shell.match(p.read_bytes()[:80])))
+    subprocess.run(['shellcheck','-x','-S','error',*map(str,scripts)],check=True,cwd=root)
+    print(f'PASS: ShellCheck finds no errors in {len(scripts)} shell scripts')
+else:
+    print('SKIP: ShellCheck is not installed here; the builder and CI run it')
 assets=root/'branding/i3'
 for relative,digest in {'vendor/greenclip-v4.2':'80b189fc9ce2e0a56e33be642875f5c3fb53647465f8024a541621307a6a290f','vendor/i3lock-color-2.13.c.5.tar.gz':'46f15cbbf339873266e014f70b5e1ec02177f0295302b615a7bd85bef40d8ad2'}.items():assert hashlib.sha256((assets/relative).read_bytes()).hexdigest()==digest,relative
 wallpaper=root/'branding/wallpapers/VIGILOS/contents/images/3840x2160.png'
@@ -55,7 +63,7 @@ assert json.loads((images.parent.parent/'metadata.json').read_text())['KPlugin']
 login_art='/usr/share/vigilos/wallpapers/VIGILOS/contents/images/3840x2160.png'
 for path in ['Skel/.config/kscreenlockerrc','branding/i3/bin/lock','scripts/lib/install-i3.sh']:
     assert login_art in (root/path).read_text(),f'{path} must keep the dark artwork'
-for folder in ['PLASMA-CONFIGS/VIGILOS-SDDM','branding/sddm/vigilos']:
+for folder in ['branding/sddm/vigilos']:
     assert hashlib.sha256((root/folder/'background.png').read_bytes()).hexdigest()==manifest['preserved_sddm']['sha256']
     cfg=configparser.ConfigParser();cfg.read(root/folder/'theme.conf');colors=cfg['General']
     def lightness(color):
@@ -169,6 +177,8 @@ if shutil.which('rofi'):
     assert 'Failed to parse' not in theme.stderr and 'accent' in (ask/'data/vigil-ask.rasi').read_text(),theme.stderr
 result=subprocess.run([sys.executable,'-B',ask/'tests/test_vigil_ask.py'],capture_output=True,text=True,timeout=180)
 assert result.returncode==0,'VIGIL Ask tests failed:\n'+result.stderr[-4000:]
+summary=[line for line in result.stderr.splitlines() if line.startswith('Ran ')][-1]+', '+result.stderr.strip().splitlines()[-1]
+if 'skipped' in summary:print(f'NOTE: VIGIL Ask {summary}; install python3-pyside6 to run the window tests here')
 print('PASS: VIGIL Ask connects to VIGIL GLM accounts only through browser-approved sign-in on chat.vigilglm.ai, asks without tools, ships no Claude Code parts, and keeps its i3 keys, bar and lock stop, and its Plasma shortcuts, KRunner runner and Dolphin menu')
 
 for path in (root/'scripts').rglob('*'):

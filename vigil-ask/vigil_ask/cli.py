@@ -104,14 +104,17 @@ def cmd_prompt(args):
     return open_window({'action': 'open', 'prompt': question, 'submit': True, 'context': [], 'notes': []})
 
 
+def history_row(entry):
+    """One line for a conversation in a history list: when it was last used and how it began."""
+    return datetime.datetime.fromtimestamp(entry['updated']).strftime('%d %b %H:%M  ') + ' '.join(entry['turns'][0]['q'].split())[:120]
+
+
 def cmd_history(args):
     entries = sorted(core.load_history(), key=lambda e: e['updated'], reverse=True)
     if not entries:
         core.notify('No recent questions.')
         return 0
-    rows = [datetime.datetime.fromtimestamp(e['updated']).strftime('%d %b %H:%M  ') + ' '.join(e['turns'][0]['q'].split())[:120]
-            for e in entries]
-    choice = rofi('History', rows, ['-format', 'i', '-i'])
+    choice = rofi('History', [history_row(e) for e in entries], ['-format', 'i', '-i'])
     if choice is None or not choice.isdigit():
         return 0
     return open_window({'action': 'open', 'history': entries[int(choice)]['id'], 'context': [], 'notes': []})
@@ -153,6 +156,9 @@ def cmd_ask(args):
     signal.signal(signal.SIGUSR1, lambda *_: stop.append(1))
     unwatch = core.watch_screen_lock(lambda: stop.append(1))
     config = core.load_config()
+    note = vigil_glm.unknown_settings(config['model'], config['effort'])
+    if note:
+        print(f'vigil-ask: {note}', file=sys.stderr)
     run = vigil_glm.Run(conversation, config['model'], config['effort'])
     core.set_status('working', stoppable=True)
     answer = ''

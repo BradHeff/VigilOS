@@ -2,13 +2,14 @@
 """Build VIGIL OS ISOs in disposable guests from verified Fedora inputs."""
 from __future__ import annotations
 import argparse, datetime, fcntl, hashlib, json, os, re, shlex, shutil
-import socket, subprocess, sys, threading, time, tomllib, urllib.request
+import socket, subprocess, sys, threading, time, tomllib, urllib.parse, urllib.request
 from pathlib import Path
 sys.dont_write_bytecode = True
 from version import BuildLock, preview_release, reserve_release
 
 REPO = Path(__file__).resolve().parents[2]
 FEDORA_KEY = '36F612DCF27F7D1A48A835E4DBFCF71C6D9F90A6'
+REPO_PACKAGES = ('vigil-ask', 'vigilos-release-identity', 'vigilos-branding', 'vigilos-wallpaper-compat', 'vigilos-i3-desktop', 'vpm')
 INPUTS = {
     'kde': ('KDE/x86_64/iso', 'Fedora-KDE-Desktop-Live-44-1.7.x86_64.iso',
             'Fedora-KDE-44-1.7-x86_64-CHECKSUM',
@@ -97,11 +98,36 @@ runcmd:
 
 def copy_source(work, release_dir):
     """Create read-only source media with frozen release metadata."""
-    roots=['scripts','branding','Skel','PLASMA-CONFIGS','kickstarts','vigil-ask','README.md','LICENSE','LICENSES']
-    extra=[f'vpm={release_dir / "vpm"}'] if (release_dir/'vpm').is_dir() else []
+    roots=['scripts','branding','Skel','kickstarts','vigil-ask','README.md','LICENSE','LICENSES']
+    extra=[f'{name}={release_dir / name}' for name in ('vpm','repo') if (release_dir/name).is_dir()]
     run(['xorriso','-as','mkisofs','-quiet','-R','-J','-V','VIGIL_SOURCE',
          '-m','__pycache__','-m','*.pyc','-o',work/'source.iso','-graft-points',*[f'{name}={REPO/name}' for name in roots],
          f'version.json={release_dir / "version.json"}', f'release.json={release_dir / "release.json"}',*extra],cwd=REPO)
+
+def repo_file(url, desktop):
+    """The DNF repository definition the identity package ships when a build names a VIGIL package repository."""
+    return (f'[vigilos]\nname=VIGIL OS packages\nbaseurl={url}/44/{desktop}/\nenabled=1\ngpgcheck=1\nrepo_gpgcheck=1\n'
+            'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-vigilos\nskip_if_unavailable=True\n'
+            f'includepkgs={",".join(REPO_PACKAGES)}\n')
+
+def repo_settings(args, parser):
+    """The package repository to build in, or None. Both --repo-url and --repo-key are needed, and nothing ships without them."""
+    if not (args.repo_url or args.repo_key): return None
+    if not (args.repo_url and args.repo_key): parser.error('--repo-url and --repo-key go together')
+    url=urllib.parse.urlsplit(args.repo_url)
+    if url.scheme!='https' or not url.hostname or url.username or url.password or url.query or url.fragment or not re.fullmatch(r'[A-Za-z0-9._~/-]*',url.path):
+        parser.error('--repo-url must be a plain https:// address')
+    key=args.repo_key.read_bytes() if args.repo_key.is_file() else b''
+    if not (key.startswith(b'-----BEGIN PGP PUBLIC KEY BLOCK-----') and b'PRIVATE' not in key and len(key)<65536):
+        parser.error('--repo-key must be an ASCII-armoured public key, as scripts/make-repo.sh exports it')
+    return args.repo_url.rstrip('/'),key
+
+def stage_repo(parent, settings):
+    """Put the repository definitions and public key on the source media for the identity package."""
+    url,key=settings
+    stage=parent/'repo';stage.mkdir()
+    (stage/'RPM-GPG-KEY-vigilos').write_bytes(key)
+    for desktop in ('kde','i3'):(stage/f'vigilos-{desktop}.repo').write_text(repo_file(url,desktop))
 
 def vpm_source(args, parser):
     """The VpM checkout to include, or None. ../VpM is used when present unless --no-vpm."""
@@ -206,8 +232,8 @@ def build_edition(desktop, inputs, args, parent):
         stream_build(ssh+[remote],work,qemu,args.build_timeout)
         manifest=run(ssh+['sudo python3 /build/source/scripts/lib/export-artifacts.py'],capture_output=True,text=True)
         record=json.loads(manifest.stdout)
-        expected={args.release.iso_name(desktop), args.release.evidence_name(desktop)}
-        if {entry['name'] for entry in record} != expected or len(record) != 2:
+        expected={args.release.iso_name(desktop), args.release.evidence_name(desktop), args.release.rpms_name(desktop)}
+        if {entry['name'] for entry in record} != expected or len(record) != 3:
             raise RuntimeError('Builder artifacts do not match the reserved release/edition')
         if any(entry.get('release') != args.release.record() for entry in record):
             raise RuntimeError('Builder release metadata differs from the reserved run snapshot')
@@ -248,8 +274,11 @@ def main():
     parser.add_argument('--check',action='store_true',help='check host prerequisites/source without starting a VM or downloading')
     parser.add_argument('--vpm',type=Path,default=None,help='VpM source repository to build into the ISO (default: ../VpM when present)')
     parser.add_argument('--no-vpm',action='store_true',help='build the ISO without VpM')
+    parser.add_argument('--repo-url',default=None,help='https:// address of the signed VIGIL package repository the image should use (off by default)')
+    parser.add_argument('--repo-key',type=Path,default=None,help='armoured public key that signs that repository')
     args=parser.parse_args()
     args.vpm_source=vpm_source(args,parser)
+    args.repo=repo_settings(args,parser)
     args.workspace=args.workspace.resolve()
     args.output=args.output.resolve() if args.output else None
     args.cache=(args.cache or args.workspace/'cache').resolve()
@@ -260,7 +289,7 @@ def main():
     if not os.access('/dev/kvm',os.R_OK|os.W_OK):parser.error('Existing usable /dev/kvm required; no host permission changes are made')
     run(['bash',REPO/'scripts/validate.sh'])
     upcoming=preview_release(REPO/'version.json')
-    included=f'VpM from {args.vpm_source}' if args.vpm_source else 'no VpM'
+    included=(f'VpM from {args.vpm_source}' if args.vpm_source else 'no VpM')+(f' and package updates from {args.repo[0]}' if args.repo else '')
     if args.check:
         log(f'Host prerequisites and source checks passed; next release {upcoming.version} ({upcoming.codename}) with {included}; version counter unchanged')
         return
@@ -289,9 +318,13 @@ def build_locked_workspace(args, release_lock):
         log(f'Building and testing VpM from {args.vpm_source}')
         vpm=stage_vpm(args.vpm_source,parent,args.workspace/'vpm-target')
         log(f'VpM {vpm["version"]}-{vpm["release"]} staged for the ISO')
+    if args.repo:
+        stage_repo(parent,args.repo)
+        log(f'Package updates will come from {args.repo[0]}')
     args.release=reserve_release(REPO,parent,stamp,release_lock)
     log(f'Reserved VIGIL OS {args.release.version} ({args.release.codename}) for this run; both editions share this version')
-    result={'release':args.release.record(),'desktop':args.desktop,'output':str(args.output),'vpm':vpm,'status':'running'}
+    result={'release':args.release.record(),'desktop':args.desktop,'output':str(args.output),'vpm':vpm,
+            'repo':args.repo[0] if args.repo else None,'status':'running'}
     (parent/'RUN.json').write_text(json.dumps(result,indent=2)+'\n')
     try:
         for desktop in (['kde','i3'] if args.desktop=='both' else [args.desktop]):

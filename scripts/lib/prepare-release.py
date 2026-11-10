@@ -33,9 +33,9 @@ CPE_NAME="cpe:/o:vigilos:vigilos:{version}"
 VARIANT="{variant}"
 VARIANT_ID={desktop}
 HOME_URL="https://vigilglm.ai"
-DOCUMENTATION_URL="https://docs.vigilglm.ai"
-SUPPORT_URL="https://support.vigilglm.ai"
-BUG_REPORT_URL="https://github.com/vigilglm/vigilos/issues"
+DOCUMENTATION_URL="https://github.com/BradHeff/VigilOS#readme"
+SUPPORT_URL="https://github.com/BradHeff/VigilOS/issues"
+BUG_REPORT_URL="https://github.com/BradHeff/VigilOS/issues"
 PRIVACY_POLICY_URL="https://vigilglm.ai/privacy"
 DEVELOPER="Brad Heffernan"
 ''',

@@ -6,7 +6,6 @@ source "$BUILD_DIR/scripts/lib/require-builder.sh"
 vigilos_require_builder
 source "$BUILD_DIR/scripts/lib/product-version.sh"
 BRANDING_DIR="$BUILD_DIR/branding"
-PLASMA_CFG_DIR="$BUILD_DIR/PLASMA-CONFIGS"
 SKEL_DIR="$BUILD_DIR/Skel"
 WORK_DIR="$(mktemp -d "${VIGIL_WORK_ROOT:-/var/tmp}/vigilos-branding.XXXXXX")"
 DESKTOP="${VIGIL_DESKTOP:-kde}"
@@ -342,120 +341,6 @@ sudo chroot "$ROOTFS_DIR" systemctl enable vigilos-first-boot.service 2>/dev/nul
 sudo mkdir -p "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants"
 sudo ln -sf /etc/systemd/system/vigilos-first-boot.service "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants/vigilos-first-boot.service" 2>/dev/null || true
 
-echo "  - Creating GPU driver setup service..."
-
-sudo tee "$ROOTFS_DIR/usr/local/bin/vigilos-gpu-setup.sh" > /dev/null << 'GPUSETUP_SCRIPT'
-#!/bin/bash
-
-set -euo pipefail
-LOG="/var/log/vigilos-gpu-setup.log"
-echo "$(date): VIGILOS GPU setup starting" >> "$LOG"
-
-if [ -d /run/initramfs/live ] || grep -q "rd.live" /proc/cmdline 2>/dev/null; then
-    echo "$(date): live environment - skipping GPU setup" >> "$LOG"
-    exit 0
-fi
-
-# Detect NVIDIA display controllers from sysfs.
-nvidia_present() {
-    local v cls dev
-    for v in /sys/bus/pci/devices/*/vendor; do
-        [ -r "$v" ] || continue
-        [ "$(cat "$v" 2>/dev/null)" = "0x10de" ] || continue
-        dev="$(dirname "$v")"
-        cls="$(cat "$dev/class" 2>/dev/null)"
-        case "$cls" in
-            0x0300*|0x0302*) return 0 ;;
-        esac
-    done
-    return 1
-}
-
-if ! nvidia_present; then
-    echo "$(date): no NVIDIA GPU detected (AMD/Intel use in-kernel KMS, nothing to do)" >> "$LOG"
-    exit 0
-fi
-
-echo "$(date): NVIDIA GPU detected - installing proprietary driver" >> "$LOG"
-
-dnf install -y \
-    "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm" \
-    "https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm" \
-    >> "$LOG" 2>&1 || { echo "$(date): ERROR repository setup failed; retry next boot" >> "$LOG"; exit 1; }
-
-if dnf install -y akmod-nvidia xorg-x11-drv-nvidia-cuda >> "$LOG" 2>&1; then
-
-    akmods --force >> "$LOG" 2>&1 || { echo "$(date): ERROR module build failed; retry next boot" >> "$LOG"; exit 1; }
-    modinfo -k "$(uname -r)" nvidia >> "$LOG" 2>&1 || { echo "$(date): ERROR NVIDIA module unavailable; retry next boot" >> "$LOG"; exit 1; }
-
-    touch /var/lib/vigilos-nvidia-ready
-    echo "$(date): akmod-nvidia installed; reboot flag set" >> "$LOG"
-else
-    echo "$(date): ERROR driver install failed; retry next boot" >> "$LOG"
-    exit 1
-fi
-
-echo "$(date): GPU setup complete" >> "$LOG"
-GPUSETUP_SCRIPT
-sudo chmod +x "$ROOTFS_DIR/usr/local/bin/vigilos-gpu-setup.sh"
-
-sudo tee "$ROOTFS_DIR/etc/systemd/system/vigilos-gpu-setup.service" > /dev/null << 'GPUSETUP_EOF'
-[Unit]
-Description=VIGILOS GPU Driver Setup (installs NVIDIA driver on first boot)
-After=network-online.target
-Wants=network-online.target
-ConditionPathExists=!/var/lib/vigilos-gpu-setup-done
-ConditionKernelCommandLine=!rd.live.image
-# Official-only builds defer proprietary driver repository setup.
-ConditionPathExists=/etc/vigilos/enable-third-party-gpu
-
-[Service]
-Type=oneshot
-ExecCondition=/usr/local/libexec/vigilos-is-live --installed
-ExecStart=/usr/local/bin/vigilos-gpu-setup.sh
-ExecStartPost=/bin/touch /var/lib/vigilos-gpu-setup-done
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-GPUSETUP_EOF
-
-sudo chroot "$ROOTFS_DIR" systemctl disable vigilos-gpu-setup.service 2>/dev/null || true
-sudo rm -f "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants/vigilos-gpu-setup.service"
-
-sudo tee "$ROOTFS_DIR/usr/local/bin/vigilos-gpu-notify.sh" > /dev/null << 'GPUNOTIFY_SCRIPT'
-#!/bin/bash
-
-[ -f /var/lib/vigilos-nvidia-ready ] || exit 0
-SHOWN="$HOME/.config/vigilos-nvidia-notified"
-[ -f "$SHOWN" ] && exit 0
-
-TITLE="VIGIL OS — NVIDIA driver ready"
-MSG="The proprietary NVIDIA driver has been installed and built. Please reboot to enable full graphics acceleration."
-
-if command -v kdialog >/dev/null 2>&1; then
-    kdialog --title "$TITLE" --passivepopup "$MSG" 20 >/dev/null 2>&1 || \
-    kdialog --title "$TITLE" --msgbox "$MSG" >/dev/null 2>&1 || true
-elif command -v notify-send >/dev/null 2>&1; then
-    notify-send -u critical -t 20000 "$TITLE" "$MSG" >/dev/null 2>&1 || true
-fi
-
-mkdir -p "$HOME/.config" && touch "$SHOWN"
-GPUNOTIFY_SCRIPT
-sudo chmod +x "$ROOTFS_DIR/usr/local/bin/vigilos-gpu-notify.sh"
-
-sudo mkdir -p "$ROOTFS_DIR/etc/skel/.config/autostart"
-sudo tee "$ROOTFS_DIR/etc/skel/.config/autostart/vigilos-gpu-notify.desktop" > /dev/null << 'GPUNOTIFY_DESKTOP'
-[Desktop Entry]
-Type=Application
-Name=VIGILOS NVIDIA Driver Notice
-Exec=/usr/local/bin/vigilos-gpu-notify.sh
-Icon=vigilos-logo
-X-KDE-autostart-after=panel
-OnlyShowIn=KDE;
-NoDisplay=true
-GPUNOTIFY_DESKTOP
-
 echo ""
 echo "=== Applying Plymouth Boot Splash ==="
 
@@ -655,7 +540,7 @@ if [[ -d "$BRANDING_DIR/grub/vigilos" ]]; then
     echo "  - Configuring GRUB defaults..."
     sudo sed -i '/^GRUB_THEME=/d;/^GRUB_DISTRIBUTOR=/d;/^GRUB_DISABLE_OS_PROBER=/d;/^GRUB_GFXMODE=/d;/^GRUB_GFXPAYLOAD_LINUX=/d' "$ROOTFS_DIR/etc/default/grub" 2>/dev/null || true
 
-    GRUB_EXTRA_CMDLINE="rhgb quiet rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0"
+    GRUB_EXTRA_CMDLINE="rhgb quiet"
     if grep -q "^GRUB_CMDLINE_LINUX=" "$ROOTFS_DIR/etc/default/grub" 2>/dev/null; then
 
         if ! grep -q "rhgb" "$ROOTFS_DIR/etc/default/grub"; then
@@ -716,8 +601,8 @@ if [[ -f "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg" ]]; then
         "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg"
 
     sudo sed -i \
-        -e '/^\s*linux/s/$/ selinux=1 enforcing=1 rhgb quiet rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0/' \
-        -e '/^\s*linuxefi/s/$/ selinux=1 enforcing=1 rhgb quiet rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0/' \
+        -e '/^\s*linux/s/$/ selinux=1 enforcing=1 rhgb quiet/' \
+        -e '/^\s*linuxefi/s/$/ selinux=1 enforcing=1 rhgb quiet/' \
         "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg"
 
     if ! grep -q "set theme=" "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg"; then
@@ -750,8 +635,8 @@ if [[ -f "$WORK_DIR/new_iso/boot/grub2/grub.cfg" ]]; then
         "$WORK_DIR/new_iso/boot/grub2/grub.cfg"
 
     sudo sed -i \
-        -e '/^\s*linux/s/$/ selinux=1 enforcing=1 rhgb quiet rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0/' \
-        -e '/^\s*linuxefi/s/$/ selinux=1 enforcing=1 rhgb quiet rd.driver.blacklist=nouveau modprobe.blacklist=nouveau nouveau.modeset=0/' \
+        -e '/^\s*linux/s/$/ selinux=1 enforcing=1 rhgb quiet/' \
+        -e '/^\s*linuxefi/s/$/ selinux=1 enforcing=1 rhgb quiet/' \
         "$WORK_DIR/new_iso/boot/grub2/grub.cfg"
 
     if ! grep -q "set theme=" "$WORK_DIR/new_iso/boot/grub2/grub.cfg"; then
@@ -778,14 +663,9 @@ grub2-script-check "$WORK_DIR/new_iso/EFI/BOOT/grub.cfg"
 echo ""
 echo "=== Applying SDDM Theme ==="
 
-SDDM_SRC=""
-if [[ -d "$PLASMA_CFG_DIR/VIGILOS-SDDM" ]]; then
-    SDDM_SRC="$PLASMA_CFG_DIR/VIGILOS-SDDM"
-elif [[ -d "$BRANDING_DIR/sddm/vigilos" ]]; then
-    SDDM_SRC="$BRANDING_DIR/sddm/vigilos"
-fi
+SDDM_SRC="$BRANDING_DIR/sddm/vigilos"
 
-if [[ -n "$SDDM_SRC" ]]; then
+if [[ -d "$SDDM_SRC" ]]; then
     echo "  - Copying SDDM theme..."
     sudo mkdir -p "$ROOTFS_DIR/usr/share/sddm/themes/vigilos"
     sudo cp -r "$SDDM_SRC/"* "$ROOTFS_DIR/usr/share/sddm/themes/vigilos/"
@@ -841,20 +721,10 @@ if [[ -f "$BRANDING_DIR/logos/vigilos-watermark-128.png" ]]; then
 fi
 
 echo "  - Icon themes..."
-if [[ -d "$BRANDING_DIR/icons/hicolor" ]]; then
-    sudo mkdir -p "$ROOTFS_DIR/usr/share/icons/hicolor"
-    sudo cp -r "$BRANDING_DIR/icons/hicolor/"* "$ROOTFS_DIR/usr/share/icons/hicolor/"
-fi
-
 copy_if_exists "$BRANDING_DIR/i3/appearance/icons/Slot-Beauty-Dark-Icons" "$ROOTFS_DIR/usr/share/icons/Slot-Beauty-Dark-Icons"
 
 echo "  - Cursor themes..."
 copy_if_exists "$BRANDING_DIR/cursors/Qogir-white-cursors" "$ROOTFS_DIR/usr/share/icons/Qogir-white-cursors"
-copy_if_exists "$BRANDING_DIR/cursors/Qogir-cursors" "$ROOTFS_DIR/usr/share/icons/Qogir-cursors"
-copy_if_exists "$BRANDING_DIR/cursors/oreo_white_cursors" "$ROOTFS_DIR/usr/share/icons/oreo_white_cursors"
-copy_if_exists "$BRANDING_DIR/cursors/Bibata-Modern-Ice-Regular-Windows" "$ROOTFS_DIR/usr/share/icons/Bibata-Modern-Ice-Regular-Windows"
-copy_if_exists "$BRANDING_DIR/cursors/Bibata-Modern-Ice-Large-Windows" "$ROOTFS_DIR/usr/share/icons/Bibata-Modern-Ice-Large-Windows"
-copy_if_exists "$BRANDING_DIR/cursors/Bibata-Modern-Ice-Extra-Large-Windows" "$ROOTFS_DIR/usr/share/icons/Bibata-Modern-Ice-Extra-Large-Windows"
 
 echo "  - Shared dark GTK theme..."
 copy_if_exists "$BRANDING_DIR/i3/appearance/themes/VALYRIAN-Total-Steel" "$ROOTFS_DIR/usr/share/themes/VALYRIAN-Total-Steel"
@@ -870,17 +740,11 @@ echo "  - Color scheme..."
 if [[ -f "$BRANDING_DIR/colourscheme/VIGILDark.colors" ]]; then
     sudo mkdir -p "$ROOTFS_DIR/usr/share/color-schemes"
     sudo cp "$BRANDING_DIR/colourscheme/VIGILDark.colors" "$ROOTFS_DIR/usr/share/color-schemes/VIGILDark.colors"
-elif [[ -f "$BRANDING_DIR/plasma-themes/PurPurDay-Plasma/colors" ]]; then
-    sudo mkdir -p "$ROOTFS_DIR/usr/share/color-schemes"
-    sudo cp "$BRANDING_DIR/plasma-themes/PurPurDay-Plasma/colors" "$ROOTFS_DIR/usr/share/color-schemes/VIGILDark.colors"
 fi
 
 echo "  - Konsole color scheme..."
 sudo mkdir -p "$ROOTFS_DIR/usr/share/konsole"
 sudo install -m0644 "$BRANDING_DIR/colourscheme/VIGILDark-Konsole.colorscheme" "$ROOTFS_DIR/usr/share/konsole/VIGILDark-Konsole.colorscheme"
-if [[ -f "$BRANDING_DIR/colourscheme/PurPurDayBlur-Konsole.colorscheme" ]]; then
-    sudo cp "$BRANDING_DIR/colourscheme/PurPurDayBlur-Konsole.colorscheme" "$ROOTFS_DIR/usr/share/konsole/PurPurDayBlur-Konsole.colorscheme"
-fi
 
 echo "  - Native Breeze decoration follows the dark palette..."
 
@@ -938,10 +802,6 @@ if [[ -d "$SKEL_DIR" ]]; then
     [[ -d "$SKEL_DIR/.config/gtk-3.0" ]] && sudo cp -r "$SKEL_DIR/.config/gtk-3.0" "$ROOTFS_DIR/etc/skel/.config/"
     [[ -d "$SKEL_DIR/.config/gtk-4.0" ]] && sudo cp -r "$SKEL_DIR/.config/gtk-4.0" "$ROOTFS_DIR/etc/skel/.config/"
     [[ -d "$SKEL_DIR/.config/environment.d" ]] && sudo cp -r "$SKEL_DIR/.config/environment.d" "$ROOTFS_DIR/etc/skel/.config/"
-    if [[ -f "$SKEL_DIR/.bashrc" ]]; then
-
-        sudo install -Dm0644 "$SKEL_DIR/.bashrc" "$ROOTFS_DIR/usr/share/vigilos/shell/bashrc"
-    fi
     [[ -d "$SKEL_DIR/.local" ]] && sudo cp -r "$SKEL_DIR/.local" "$ROOTFS_DIR/etc/skel/"
 fi
 
@@ -1245,9 +1105,6 @@ echo ""
 echo "=== Updating Icon Caches ==="
 if [[ -x "$ROOTFS_DIR/usr/bin/gtk-update-icon-cache" ]]; then
     sudo chroot "$ROOTFS_DIR" gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
-    if [[ -d "$ROOTFS_DIR/usr/share/icons/Magna-Glassy-Light-Icons" ]]; then
-        sudo chroot "$ROOTFS_DIR" gtk-update-icon-cache -f /usr/share/icons/Magna-Glassy-Light-Icons 2>/dev/null || true
-    fi
 fi
 if [[ -x "$ROOTFS_DIR/usr/bin/kbuildsycoca6" ]]; then
     sudo chroot "$ROOTFS_DIR" kbuildsycoca6 --noincremental 2>/dev/null || true

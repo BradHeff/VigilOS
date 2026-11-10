@@ -1,12 +1,13 @@
 """The VIGIL Ask window, shared by the Plasma and i3 editions."""
 from __future__ import annotations
-import html, json, os, queue, threading
+import html, json, os, queue, re, threading
 from pathlib import Path
 from PySide6.QtCore import Qt, QTimer, Slot, SLOT
 from PySide6.QtGui import QDesktopServices, QGuiApplication, QIcon, QKeySequence, QShortcut
 from PySide6.QtNetwork import QLocalServer
-from PySide6.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QLabel, QPlainTextEdit, QPushButton,
-                               QStackedWidget, QTextBrowser, QToolButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout,
+                               QLabel, QListWidget, QPlainTextEdit, QPushButton, QStackedWidget, QTextBrowser, QToolButton,
+                               QVBoxLayout, QWidget)
 from . import cli, core, vigil_glm
 
 SETUP_TEXT = {
@@ -15,6 +16,27 @@ SETUP_TEXT = {
     'signin': ("Sign in with your VIGIL GLM account in your browser, where you can also create a free account. "
                "Questions use the account's credits, within its plan's limits."),
 }
+HINT = ' · Enter asks, Shift+Enter starts a new line, Esc closes'
+HISTORY_DAYS = (0, 1, 7, 30, 90, 365)
+FENCE = re.compile(r'^ {0,3}(`{3,}|~{3,})')
+
+
+def with_copy_links(markdown, blocks):
+    """The answer with a Copy code link after each fenced code block; the blocks' text is appended to blocks."""
+    out, fence, code = [], None, []
+    for line in markdown.split('\n'):
+        out.append(line)
+        found = FENCE.match(line)
+        if fence is None:
+            if found and not (found.group(1)[0] == '`' and '`' in line[found.end():]):
+                fence, code = found.group(1), []
+        elif found and found.group(1)[0] == fence[0] and len(found.group(1)) >= len(fence) and not line[found.end():].strip():
+            blocks.append('\n'.join(code))
+            out += ['', f'[Copy code](vigil-copy:{len(blocks) - 1})', '']
+            fence = None
+        else:
+            code.append(line)
+    return '\n'.join(out)
 
 
 def empty(layout):
@@ -26,15 +48,78 @@ def empty(layout):
 
 
 class Answer(QTextBrowser):
-    """Rendered Markdown that loads no images or other resources and opens only web links."""
+    """Rendered Markdown that loads no images or other resources; the window decides what a link does."""
 
     def __init__(self):
         super().__init__()
         self.setOpenLinks(False)
-        self.anchorClicked.connect(lambda url: url.scheme() in ('http', 'https') and QDesktopServices.openUrl(url))
 
     def loadResource(self, kind, url):
         return None
+
+
+class Settings(QDialog):
+    """Model, thinking effort and history, saved in ~/.config/vigil-ask/config.json."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('VIGIL Ask settings')
+        config = core.load_config()
+        model, effort = vigil_glm.choice(config['model'], config['effort'])
+        self.model, self.effort, self.days = QComboBox(), QComboBox(), QComboBox()
+        for box, values, current in ((self.model, vigil_glm.MODELS, model), (self.effort, vigil_glm.EFFORTS, effort)):
+            for value in values:
+                box.addItem(vigil_glm.LABELS[value], value)
+            box.setCurrentIndex(values.index(current))
+        days = config['history_days'] if isinstance(config['history_days'], int) and config['history_days'] >= 0 else 30
+        for value in sorted({*HISTORY_DAYS, days}):
+            self.days.addItem('Keep no history' if not value else '1 day' if value == 1 else f'{value} days', value)
+        self.days.setCurrentIndex(self.days.findData(days))
+        form = QFormLayout(self)
+        form.addRow('Model', self.model)
+        form.addRow('Thinking', self.effort)
+        form.addRow('Keep history for', self.days)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        self.off_button = buttons.addButton('Turn off VIGIL Ask', QDialogButtonBox.ButtonRole.DestructiveRole)
+        self.off_button.clicked.connect(self.turn_off)
+        buttons.accepted.connect(self.save)
+        buttons.rejected.connect(self.reject)
+        form.addRow(buttons)
+
+    def save(self):
+        days = self.days.currentData()
+        core.save_config(model=self.model.currentData(), effort=self.effort.currentData(), history_days=days)
+        if not days:
+            core.history_path().unlink(missing_ok=True)
+        self.accept()
+
+    def turn_off(self):
+        core.save_config(enabled=False)
+        self.accept()
+
+
+class History(QDialog):
+    """Recent conversations; the chosen one opens in the window, ready for a follow-up."""
+
+    def __init__(self, entries, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('Recent questions')
+        self.entries = entries
+        self.list = QListWidget()
+        self.list.addItems([cli.history_row(entry) for entry in entries])
+        self.list.setCurrentRow(0)
+        self.list.itemActivated.connect(self.accept)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Open | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.list)
+        layout.addWidget(buttons)
+        self.resize(600, 360)
+
+    def chosen(self):
+        row = self.list.currentRow()
+        return self.entries[row]['id'] if 0 <= row < len(self.entries) else None
 
 
 class Prompt(QPlainTextEdit):
@@ -62,6 +147,8 @@ class Window(QWidget):
         self.session_identity = None
         self.jobs, self.pending = queue.Queue(), 0
         self.dirty = False
+        self.code_blocks = []
+        self.dialog = None
         self.setWindowTitle('VIGIL Ask')
         self.setWindowIcon(QIcon.fromTheme('org.vigilos.Ask', QIcon.fromTheme('vigilos-logo')))
         self.build()
@@ -83,12 +170,15 @@ class Window(QWidget):
         badge.setStyleSheet('border: 1px solid #1763ef; border-radius: 4px; padding: 1px 6px;')
         badge.setToolTip('Your question and anything you attach are sent to VIGIL GLM, under your VIGIL GLM account, '
                          'and answered by GLM models from Z.ai.')
+        self.model_label = QLabel(textFormat=Qt.TextFormat.PlainText)
         header.addWidget(title)
         header.addStretch()
+        header.addWidget(self.model_label)
         header.addWidget(badge)
         layout.addLayout(header)
         self.pages = QStackedWidget()
         self.answer = Answer()
+        self.answer.anchorClicked.connect(self.open_link)
         self.pages.addWidget(self.answer)
         setup = QWidget()
         setup_layout = QVBoxLayout(setup)
@@ -110,7 +200,7 @@ class Window(QWidget):
         layout.addLayout(chips)
         entry = QHBoxLayout()
         self.prompt = Prompt(self.send)
-        self.prompt.setPlaceholderText('Ask a question')
+        self.prompt.setPlaceholderText('Ask a question' + HINT)
         self.prompt.setFixedHeight(self.prompt.fontMetrics().lineSpacing() * 3 + 16)
         self.ask_button = QPushButton('Ask', default=True)
         self.ask_button.clicked.connect(self.send)
@@ -136,6 +226,12 @@ class Window(QWidget):
         for button in (self.stop_button, self.copy_button, self.new_button):
             actions.addWidget(button)
         actions.addStretch()
+        self.history_button = QPushButton('History…', toolTip='Reopen a recent conversation')
+        self.history_button.clicked.connect(self.open_history)
+        self.settings_button = QPushButton('Settings…', toolTip='Model, thinking and history')
+        self.settings_button.clicked.connect(self.open_settings)
+        actions.addWidget(self.history_button)
+        actions.addWidget(self.settings_button)
         layout.addLayout(actions)
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.close)
         screen = QGuiApplication.screenAt(self.cursor().pos()) or QGuiApplication.primaryScreen()
@@ -229,6 +325,14 @@ class Window(QWidget):
         self.pages.setCurrentIndex(0 if ready else 1)
         for widget in (self.prompt, self.ask_button, self.attach_button):
             widget.setEnabled(ready)
+        for widget in (self.history_button, self.settings_button):
+            widget.setEnabled(ready and self.run is None)
+        config = core.load_config()
+        model, effort = vigil_glm.choice(config['model'], config['effort'])
+        note = vigil_glm.unknown_settings(config['model'], config['effort'])
+        self.model_label.setText(f'{vigil_glm.LABELS[model]} · {vigil_glm.LABELS[effort]} thinking' + (' (check Settings)' if note else ''))
+        self.model_label.setToolTip(note or 'Change the model and thinking in Settings')
+        self.model_label.setVisible(ready)
         session = vigil_glm.load_session()
         self.signout_button.setVisible(session is not None)
         self.account.setText(html.escape(session['email']) if session else '')
@@ -253,13 +357,18 @@ class Window(QWidget):
         if self.state != 'admin-off' and self.run is None:
             core.set_status('off' if self.state == 'off' else 'idle' if session else 'signin')
 
-    def refresh_usage(self):
+    def refresh_usage(self, force=False):
+        """Show the account's usage; VIGIL Ask asks VIGIL GLM at most once a minute unless an answer just used credits."""
         session = vigil_glm.load_session()
         if not session:
             return
         self.pending += 1
         jobs = self.jobs
-        threading.Thread(target=lambda: jobs.put(('usage', session, vigil_glm.usage(session))), daemon=True).start()
+        if force:
+            work = lambda: jobs.put(('usage', session, vigil_glm.usage(session, 0)))
+        else:
+            work = lambda: jobs.put(('usage', session, vigil_glm.usage(session)))
+        threading.Thread(target=work, daemon=True).start()
         self.timer.start()
 
     def maybe_submit(self):
@@ -278,6 +387,30 @@ class Window(QWidget):
     def accept_notice(self):
         core.save_config(notice_accepted=True)
         self.check_setup()
+
+    def open_settings(self):
+        self.dialog = Settings(self)
+        self.dialog.finished.connect(lambda result: self.check_setup())
+        self.dialog.open()
+
+    def open_history(self):
+        entries = sorted(core.load_history(), key=lambda e: e['updated'], reverse=True)
+        if not entries:
+            self.set_message('No recent questions.')
+            return
+        dialog = self.dialog = History(entries, self)
+        dialog.accepted.connect(lambda: dialog.chosen() and self.apply({'action': 'open', 'history': dialog.chosen()}))
+        dialog.open()
+
+    def open_link(self, url):
+        """Web links open in the browser; a Copy code link copies its block."""
+        if url.scheme() == 'vigil-copy':
+            index = url.path()
+            if index.isdigit() and int(index) < len(self.code_blocks):
+                QGuiApplication.clipboard().setText(self.code_blocks[int(index)])
+                self.set_message('Code copied')
+        elif url.scheme() in ('http', 'https'):
+            QDesktopServices.openUrl(url)
 
     def sign_in(self):
         from . import signin
@@ -354,7 +487,10 @@ class Window(QWidget):
         self.ask_button.setEnabled(not running)
         self.new_button.setEnabled(not running)
         self.ask_button.setText('Follow up' if self.turns and not running else 'Ask')
-        self.prompt.setPlaceholderText('Ask a follow-up question' if self.turns else 'Ask a question')
+        self.prompt.setPlaceholderText(('Ask a follow-up question' if self.turns else 'Ask a question') + HINT)
+        ready = self.state == 'ready'
+        self.history_button.setEnabled(ready and not running)
+        self.settings_button.setEnabled(ready and not running)
         self.copy_button.setEnabled(bool(self.turns and self.turns[-1]['a']))
 
     def poll(self):
@@ -393,7 +529,7 @@ class Window(QWidget):
         if state == 'done':
             self.entry_id = core.record_turn(turn['q'], turn['a'], self.entry_id)
             self.set_message('Done')
-            self.refresh_usage()
+            self.refresh_usage(force=True)
             if not self.isActiveWindow():
                 core.notify('Answer ready')
         elif state == 'signin':
@@ -421,11 +557,11 @@ class Window(QWidget):
         self.dirty = False
         bar = self.answer.verticalScrollBar()
         at_end = bar.value() >= bar.maximum() - 4
-        parts = []
+        parts, self.code_blocks = [], []
         for turn in self.turns:
             quoted = '\n'.join('> ' + line for line in turn['q'].splitlines())
             attached = f'\n\n*Attached: {", ".join(turn["attached"])}*' if turn['attached'] else ''
-            answer = turn['a'] or ('*Waiting for the answer…*' if turn['state'] == 'working' else '')
+            answer = with_copy_links(turn['a'], self.code_blocks) or ('*Waiting for the answer…*' if turn['state'] == 'working' else '')
             ending = {'stopped': '\n\n*Stopped.*', 'failed': '\n\n*Failed.*'}.get(turn['state'], '')
             parts.append(f'{quoted}{attached}\n\n{answer}{ending}')
         self.answer.setMarkdown('\n\n---\n\n'.join(parts))

@@ -18,6 +18,13 @@ cp "$ROOTFS/.buildstamp" "$WORK/SOURCES/buildstamp"
 cp "$ROOTFS/usr/lib/vigilos/release.json" "$WORK/SOURCES/release.json"
 printf '44\n' > "$WORK/SOURCES/releasever"
 python3 "$REPO_DIR/scripts/lib/prepare-repository-overrides.py" "$ROOTFS" "$WORK/SOURCES/base-repositories.repo"
+# A build given --repo-url and --repo-key also ships the signed VIGIL package repository.
+PACKAGE_REPO=0
+if [[ -f "$REPO_DIR/repo/vigilos-${VIGIL_DESKTOP:-kde}.repo" ]]; then
+    install -m0644 "$REPO_DIR/repo/vigilos-${VIGIL_DESKTOP:-kde}.repo" "$WORK/SOURCES/vigilos.repo"
+    install -m0644 "$REPO_DIR/repo/RPM-GPG-KEY-vigilos" "$WORK/SOURCES/RPM-GPG-KEY-vigilos"
+    PACKAGE_REPO=1
+fi
 cat > "$WORK/SPECS/vigilos-release-identity.spec" <<'SPEC'
 Name: vigilos-release-identity
 Version: %{vigilos_version}
@@ -56,6 +63,10 @@ install -Dpm0644 %{SOURCE2} %{buildroot}/etc/dnf/vars/releasever
 install -Dpm0644 %{SOURCE3} %{buildroot}/.buildstamp
 install -Dpm0644 %{SOURCE4} %{buildroot}/usr/share/dnf5/repos.override.d/50-vigilos-fedora-base.repo
 install -Dpm0644 %{SOURCE5} %{buildroot}/usr/lib/vigilos/release.json
+%if 0%{?vigilos_repo}
+install -Dpm0644 %{_sourcedir}/vigilos.repo %{buildroot}/etc/yum.repos.d/vigilos.repo
+install -Dpm0644 %{_sourcedir}/RPM-GPG-KEY-vigilos %{buildroot}/etc/pki/rpm-gpg/RPM-GPG-KEY-vigilos
+%endif
 mkdir -p %{buildroot}%{_licensedir}/%{name}
 cp -a %{_sourcedir}/project-licenses/. %{buildroot}%{_licensedir}/%{name}/
 %files
@@ -67,11 +78,16 @@ cp -a %{_sourcedir}/project-licenses/. %{buildroot}%{_licensedir}/%{name}/
 /etc/vigilos-release
 %config(noreplace) /etc/dnf/vars/releasever
 /usr/share/dnf5/repos.override.d/50-vigilos-fedora-base.repo
+%if 0%{?vigilos_repo}
+%config(noreplace) /etc/yum.repos.d/vigilos.repo
+/etc/pki/rpm-gpg/RPM-GPG-KEY-vigilos
+%endif
 SPEC
-rpmbuild --define "_topdir $WORK" --define "vigilos_version $VIGIL_VERSION" -bb "$WORK/SPECS/vigilos-release-identity.spec"
+rpmbuild --define "_topdir $WORK" --define "vigilos_version $VIGIL_VERSION" --define "vigilos_repo $PACKAGE_REPO" -bb "$WORK/SPECS/vigilos-release-identity.spec"
 IDENTITY="$(find "$WORK/RPMS" -name 'vigilos-release-identity-*.rpm' -type f | head -1)"
 cp "$IDENTITY" "$ROOTFS/tmp/vigilos-release-identity.rpm"
 chroot "$ROOTFS" dnf -y --releasever=44 install /tmp/vigilos-release-common.rpm /tmp/vigilos-release-identity.rpm
+if [[ $PACKAGE_REPO == 1 ]]; then chroot "$ROOTFS" rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-vigilos; fi
 
 bash "$REPO_DIR/scripts/lib/package-wallpaper-compat.sh" "$ROOTFS" "$WORK"
 WALLPAPER="$(find "$WORK/RPMS" -name 'vigilos-wallpaper-compat-*.rpm' -type f | head -1)"
@@ -80,8 +96,8 @@ cp "$WALLPAPER" "$ROOTFS/tmp/vigilos-wallpaper-compat.rpm"
 PAYLOAD="$WORK/SOURCES/branding-payload"
 mkdir -p "$PAYLOAD/usr/share/licenses/vigilos-branding"
 cp -a "$WORK/SOURCES/project-licenses/." "$PAYLOAD/usr/share/licenses/vigilos-branding/"
-PATHS=(etc/vigilos-desktop etc/skel/.config/kcm-about-distrorc etc/skel/.config/kdeglobals etc/skel/.config/mimeapps.list etc/yum.repos.d/brave-browser.repo etc/pki/rpm-gpg/RPM-GPG-KEY-brave-release usr/local/libexec/vigilos-anaconda-browser etc/skel/.config/kscreenlockerrc usr/share/color-schemes/VIGILDark.colors usr/share/plasma/desktoptheme/PurPurNight-Plasma usr/share/plasma/look-and-feel/VIGIL-Dark-Splash usr/share/plasma/look-and-feel/org.vigilos.desktop usr/local/share/plasma/look-and-feel usr/local/libexec/vigilos-configure-installed-boot usr/share/plasma/plasma-welcome/intro-customization.desktop etc/skel/.config/autostart/imsettings-start.desktop usr/local/share/applications/liveinst.desktop usr/share/cockpit/branding/vigilos usr/share/vigilos usr/share/grub/themes/vigilos usr/share/sddm/themes/vigilos usr/share/plymouth/themes/vigilos usr/share/plymouth/themes/vigilos-spinner usr/lib/dracut/modules.d/99vigilos-branding etc/anaconda/profile.d/vigilos.conf etc/sddm.conf.d/vigilos.conf usr/local/libexec/vigilos-is-live usr/local/libexec/vigilos-liveuser-setup usr/local/bin/vigilos-first-boot.sh etc/systemd/system/vigilos-first-boot.service etc/systemd/system/sddm-live-autologin.service etc/systemd/system/liveuser-setup.service etc/systemd/system/vigilos-gpu-setup.service usr/local/bin/vigilos-gpu-setup.sh usr/local/bin/vigilos-gpu-notify.sh etc/dracut.conf.d/vigilos-branding.conf)
-PATHS+=(usr/share/glib-2.0/schemas/90-vigilos-dark.gschema.override usr/share/icons/Qogir-cursors usr/share/konsole/VIGILDark-Konsole.colorscheme)
+PATHS=(etc/vigilos-desktop etc/skel/.config/kcm-about-distrorc etc/skel/.config/kdeglobals etc/skel/.config/mimeapps.list etc/yum.repos.d/brave-browser.repo etc/pki/rpm-gpg/RPM-GPG-KEY-brave-release usr/local/libexec/vigilos-anaconda-browser etc/skel/.config/kscreenlockerrc usr/share/color-schemes/VIGILDark.colors usr/share/plasma/desktoptheme/PurPurNight-Plasma usr/share/plasma/look-and-feel/VIGIL-Dark-Splash usr/share/plasma/look-and-feel/org.vigilos.desktop usr/local/share/plasma/look-and-feel usr/local/libexec/vigilos-configure-installed-boot usr/share/plasma/plasma-welcome/intro-customization.desktop etc/skel/.config/autostart/imsettings-start.desktop usr/local/share/applications/liveinst.desktop usr/share/cockpit/branding/vigilos usr/share/vigilos usr/share/grub/themes/vigilos usr/share/sddm/themes/vigilos usr/share/plymouth/themes/vigilos usr/share/plymouth/themes/vigilos-spinner usr/lib/dracut/modules.d/99vigilos-branding etc/anaconda/profile.d/vigilos.conf etc/sddm.conf.d/vigilos.conf usr/local/libexec/vigilos-is-live usr/local/libexec/vigilos-liveuser-setup usr/local/bin/vigilos-first-boot.sh etc/systemd/system/vigilos-first-boot.service etc/systemd/system/sddm-live-autologin.service etc/systemd/system/liveuser-setup.service etc/dracut.conf.d/vigilos-branding.conf)
+PATHS+=(usr/share/glib-2.0/schemas/90-vigilos-dark.gschema.override usr/share/konsole/VIGILDark-Konsole.colorscheme)
 if [[ ${VIGIL_DESKTOP:-kde} == kde ]]; then
     PATHS+=(etc/skel/.config/gtk-3.0 etc/skel/.config/gtk-4.0 etc/skel/.config/environment.d/gtk-flatpak.conf etc/skel/.config/plasmarc etc/skel/.config/ksplashrc etc/skel/.config/kwinrc usr/share/themes/VALYRIAN-Total-Steel usr/share/icons/Slot-Beauty-Dark-Icons usr/share/icons/Qogir-white-cursors)
 fi

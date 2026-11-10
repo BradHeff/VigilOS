@@ -91,6 +91,7 @@ class Versioning(unittest.TestCase):
         ten, _ = self.reserve('ten')
         self.assertEqual(ten.version, '1.10')
         self.assertEqual(ten.iso_name('i3'), 'VIGILOS-1.10-i3-x86_64.iso')
+        self.assertEqual(ten.rpms_name('kde'), 'VIGILOS-1.10-kde-rpms.tar')
         self.assertEqual(ten.iso_label('kde'), 'VIGILOS-1-10-kde-x86_64')
 
     def test_manual_build_number_and_codename_and_zero_version(self):
@@ -132,6 +133,32 @@ class Versioning(unittest.TestCase):
         seen=[]
         self.invoke('--workspace', self.base/'retry', '--desktop', 'i3', edition=lambda d,i,a,p: seen.append(a.release.version))
         self.assertEqual(seen, ['1.4'])
+
+    def test_package_repository_is_off_unless_named_and_validated(self):
+        key = self.base / 'key.asc'
+        key.write_text('-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nmDMEZ\n-----END PGP PUBLIC KEY BLOCK-----\n')
+        secret = self.base / 'secret.asc'
+        secret.write_text('-----BEGIN PGP PRIVATE KEY BLOCK-----\n-----END PGP PRIVATE KEY BLOCK-----\n')
+        before = self.config.read_bytes()
+        for bad in [['--repo-url', 'https://repo.example/vigilos'], ['--repo-key', key], ['--repo-url', 'http://repo.example', '--repo-key', key],
+                    ['--repo-url', 'https://user:pw@repo.example', '--repo-key', key], ['--repo-url', 'https://repo.example/?x=1', '--repo-key', key],
+                    ['--repo-url', 'https://repo.example', '--repo-key', secret], ['--repo-url', 'https://repo.example', '--repo-key', self.base / 'none']]:
+            with self.assertRaises(SystemExit, msg=bad), patch('sys.stderr'):
+                self.invoke('--workspace', self.base / 'refused', *bad)
+        self.assertEqual(self.config.read_bytes(), before, 'a refused repository setting consumes no version')
+        work = self.base / 'with-repo'
+        seen = []
+        self.invoke('--workspace', work, '--repo-url', 'https://repo.example/vigilos/', '--repo-key', key,
+                    edition=lambda d, i, a, parent: seen.append(sorted(p.name for p in (parent / 'repo').iterdir())))
+        self.assertEqual(seen[0], ['RPM-GPG-KEY-vigilos', 'vigilos-i3.repo', 'vigilos-kde.repo'])
+        run = next(work.glob('run-*'))
+        self.assertEqual(json.loads((run / 'RUN.json').read_text())['repo'], 'https://repo.example/vigilos')
+        repo = configparser.ConfigParser(); repo.read(run / 'repo/vigilos-kde.repo')
+        self.assertEqual(repo['vigilos']['baseurl'], 'https://repo.example/vigilos/44/kde/')
+        self.assertEqual((repo['vigilos']['gpgcheck'], repo['vigilos']['repo_gpgcheck']), ('1', '1'))
+        self.assertEqual(repo['vigilos']['includepkgs'].split(','), list(build.REPO_PACKAGES))
+        self.assertNotIn('vigilos-release-common', build.REPO_PACKAGES)
+        self.invoke('--workspace', self.base / 'without-repo', edition=lambda d, i, a, parent: self.assertFalse((parent / 'repo').exists()))
 
     def test_input_verification_failure_does_not_consume_version(self):
         before = self.config.read_bytes()
@@ -177,7 +204,7 @@ print('CHECKOUT_LOCK_REFUSAL_PASS')
     def test_actual_source_iso_contains_allocated_metadata(self):
         release,run=self.reserve()
         self.configure(build_number=3,next_version_number=0,codename='Later Manual Edit')
-        for name in ['scripts','branding','Skel','PLASMA-CONFIGS','kickstarts','vigil-ask','LICENSES']:
+        for name in ['scripts','branding','Skel','kickstarts','vigil-ask','LICENSES']:
             path=self.repo/name;path.mkdir();(path/'fixture.txt').write_text(name)
         (self.repo/'LICENSE').write_text('test fixture')
         (self.repo/'README.md').write_text('Wallpaper credit: https://www.deviantart.com/byrotek')
@@ -247,6 +274,11 @@ print('CHECKOUT_LOCK_REFUSAL_PASS')
                 result=subprocess.run(['rpmspec','--parse','--define','vigilos_version 1.10','--define','vigilos_i3 '+edition,str(file)],text=True,capture_output=True,check=True,timeout=10)
                 self.assertRegex(result.stdout,r'(?m)^Version:\s+1\.10$')
                 if spec=='vigilos-branding.spec':self.assertIn('Requires: vigilos-release-identity = 1.10',result.stdout)
+                if spec=='vigilos-release-identity.spec':
+                    self.assertNotIn('/etc/yum.repos.d/vigilos.repo',result.stdout)
+                    shipped=subprocess.run(['rpmspec','--parse','--define','vigilos_version 1.10','--define','vigilos_repo 1',str(file)],text=True,capture_output=True,check=True,timeout=10).stdout
+                    self.assertIn('%config(noreplace) /etc/yum.repos.d/vigilos.repo',shipped)
+                    self.assertIn('/etc/pki/rpm-gpg/RPM-GPG-KEY-vigilos',shipped)
 
 
 if __name__=='__main__':

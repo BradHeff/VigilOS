@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 """Stands in for chat.vigilglm.ai in tests: desktop sign-in, account, usage and the /api/chat event stream.
-Modes: ok, slow, stalled, truncated, auth, credits, cap, error, crash, replace. Run alone as: fake-vigil.py PORT LOG [MODE].
+Modes: ok, slow, stalled, truncated, auth, credits, cap, error, crash, replace, code. Run alone as: fake-vigil.py PORT LOG [MODE].
 The tokens in TOKENS are already connected, for tests that start signed in."""
 import http.server, json, secrets, sys, threading, time, urllib.parse
 
@@ -8,6 +8,7 @@ CLIENT_ID = 'vigilos-ask'
 TOKENS = {'access_token': 'fake-access-1', 'refresh_token': 'fake-refresh-1', 'token_type': 'Bearer', 'expires_in': 3600}
 EMAIL = 'tester@example.invalid'
 ANSWER = ['Fake ', 'answer ', 'for ', 'tests.']
+CODE_ANSWER = ['Run this:\n\n```python\n', 'print("hi")\n', '```\n\nThen this:\n\n~~~\nls -l\n~~~\n']
 USAGE = {'plan': 'free', 'percent': 12, 'byEffort': {}, 'fiveHour': {'percent': 12, 'credits': 5600, 'budget': 46667, 'resetsAt': None},
          'week': {'percent': 3, 'credits': 7000, 'budget': 233333, 'resetsAt': None}}
 
@@ -86,6 +87,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == '/desktop/verify':
             self.reply(200, b'<!doctype html><title>Connect VIGIL Ask</title>Enter the code shown in VIGIL Ask', 'text/html')
         elif path in ('/api/auth/me', '/api/usage'):
+            self.server.record({'path': path})
             if not self.signed_in():
                 self.json(401, {'error': 'Not authenticated'})
             else:
@@ -183,7 +185,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_header('x-vigil-cap', json.dumps({'window': 'fiveHour', 'resetsAt': '2026-11-01T05:00:00Z'}))
         self.end_headers()
         frames = [{'choices': [{'delta': {'reasoning_content': 'Considering the question.'}}]}]
-        frames += [{'choices': [{'delta': {'content': chunk}}]} for chunk in ANSWER]
+        frames += [{'choices': [{'delta': {'content': chunk}}]} for chunk in (CODE_ANSWER if mode == 'code' else ANSWER)]
         if mode == 'error':
             frames = frames[:2] + [{'error': 'The model failed'}]
         if mode == 'truncated':

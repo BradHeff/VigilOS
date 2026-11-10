@@ -43,6 +43,7 @@ find "$PAYLOAD" -type d -exec chmod 0755 {} +
 chmod 0644 "$PAYLOAD/etc/skel/.bashrc.d/50-vigilos-i3.sh" "$PAYLOAD/etc/skel/.git-prompt.bash"
 cp -a "$ASSETS/appearance/themes" "$PAYLOAD/usr/share/"
 cp -a "$ASSETS/appearance/icons" "$PAYLOAD/usr/share/"
+cp -a "$REPO_DIR/branding/cursors/Qogir-white-cursors" "$PAYLOAD/usr/share/icons/"
 tar -C "$PAYLOAD" -cf "$RPM/SOURCES/payload.tar" .
 cat > "$RPM/SPECS/i3.spec" <<'SPEC'
 Name: vigilos-i3-desktop

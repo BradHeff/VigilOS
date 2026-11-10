@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Describe only finalized run outputs, never private builder keys or disks."""
 from pathlib import Path
-import hashlib,json,tarfile,sys
+import hashlib,json,re,tarfile,sys
 sys.dont_write_bytecode=True
 from version import source_release
 if not Path("/etc/vigilos-disposable-builder").is_file():
@@ -19,8 +19,14 @@ with tarfile.open(evidence,'w:gz') as archive:
     for path in Path('/build/work').glob('vigilos-branding.*/package-manifest.txt'):
         archive.add(path,arcname='package-manifest.txt')
     if Path('/build-bootstrap.log').is_file():archive.add('/build-bootstrap.log',arcname='builder-bootstrap.log')
+# The product RPMs installed in the image, for scripts/make-repo.sh to sign and publish.
+rpms=[p for p in sorted(Path('/build/work').glob('vigilos-branding.*/*/RPMS/*/*.rpm')) if not re.search(r'-debug(info|source)-',p.name)]
+if not rpms:raise SystemExit('No product RPMs were built')
+bundle=Path('/build/export')/release.rpms_name(edition)
+with tarfile.open(bundle,'w') as archive:
+    for path in rpms:archive.add(path,arcname=path.name)
 records=[]
-for path in [iso,evidence]:
+for path in [iso,evidence,bundle]:
     with path.open('rb') as stream:digest=hashlib.file_digest(stream,'sha256').hexdigest()
     records.append({'name':path.name,'path':str(path),'bytes':path.stat().st_size,'sha256':digest,'release':release.record()})
 print(json.dumps(records))

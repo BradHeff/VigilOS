@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 case $- in *i*) ;; *) return ;; esac
 HISTCONTROL=ignoreboth:erasedups
 HISTSIZE=1000

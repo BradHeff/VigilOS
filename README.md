@@ -50,9 +50,17 @@ bash scripts/build-and-brand.sh --check
 
 The script checks the Fedora downloads against Fedora's signed checksums, then builds each edition in a fresh throwaway VM with 6 GiB of RAM and four CPUs. Installing packages, mounting images and preparing the image all happen inside that VM. If a host tool is missing, the script names it and stops; it never installs anything on your machine.
 
-Finished ISOs, their SHA256 checksums and the build evidence go in `.build/output/<timestamp>/`, and earlier builds are never overwritten. Logs and the temporary VM files stay in `.build/`, which must not be published. `bash scripts/build-and-brand.sh --help` lists the options for the workspace, cache and output folders.
+Finished ISOs, their SHA256 checksums, the build evidence and each edition's product RPMs (`VIGILOS-<version>-<edition>-rpms.tar`) go in `.build/output/<timestamp>/`, and earlier builds are never overwritten. Logs and the temporary VM files stay in `.build/`, which must not be published. `bash scripts/build-and-brand.sh --help` lists the options for the workspace, cache and output folders.
 
 Version numbers have the form `build_number.version_number`. For a bigger release you change the first number and the codename by hand in `version.json`. Each real build adds one to the second number, both editions built together get the same number, and `1.9` is followed by `1.10`. Checks don't change it, and neither does deleting `.build`. A build that fails after taking a number still uses that number up.
+
+Installed systems can take updates to VIGIL Ask, the VIGIL branding and identity packages and VpM through DNF once a signed VIGIL package repository exists. None is published yet, so builds ship without one. To publish, run this where your signing key lives (it needs rpmsign, createrepo_c and gpg):
+
+```bash
+bash scripts/make-repo.sh --repo DIR --key KEYID .build/output/<timestamp>
+```
+
+It signs each package and the repository metadata, keeps any version already in `DIR`, and writes the public key to `DIR/RPM-GPG-KEY-vigilos`. Upload `DIR` to an HTTPS server, then build with `--repo-url URL --repo-key DIR/RPM-GPG-KEY-vigilos`. Each edition then reads `URL/44/kde` or `URL/44/i3`, with package and metadata signatures checked.
 
 ## VpM, the VIGIL OS package manager
 
@@ -82,7 +90,7 @@ The script boots the same verified Fedora 44 Cloud image the builds use, and bui
 
 VIGIL Ask is a small window for quick questions, answered by [VIGIL GLM](https://vigilglm.ai). **Sign in** shows a short code and opens VIGIL GLM in your browser, where you sign in with email, Google or GitHub (or create a free account), enter the code and connect VIGIL Ask. There's no API key to create, and VIGIL Ask never sees your password. `vigil-ask signin` does the same from a terminal. Questions, and anything you attach, are answered in the cloud by GLM models from Z.ai and use your account's credits, within its plan's limits. The window shows how much of the 5-hour and weekly limits you've used.
 
-VIGIL Ask has no local command tools and requests answers with web search, image generation and browsing switched off. The server must enforce the connection's text-only scope, including its tools, files and saved-memory restrictions. Its tokens are kept in a file only you can read. **Sign out** deletes them locally and requests revocation on VIGIL GLM; account settings also provide Connected desktops. Real-account sign-in, credits, revocation and history behaviour still need acceptance with a test account.
+VIGIL Ask has no local command tools and requests answers with web search, image generation and browsing switched off. The server must enforce the connection's text-only scope, including its tools, files and saved-memory restrictions. Its tokens are kept in a file only you can read. **Sign out** deletes them locally and requests revocation on VIGIL GLM; account settings also provide Connected desktops. The window's **Settings** choose the model, thinking effort and how long history is kept, **History** reopens a recent conversation, and each code block in an answer has a **Copy code** link. Real-account sign-in, credits, revocation and history behaviour still need acceptance with a test account.
 
 On i3, Super+Shift+A asks through Rofi and Super+Ctrl+A attaches the selected text. Polybar shows the status, and Thunar's Send To menu attaches files. On Plasma, Meta+Alt+A opens the window, Meta+Alt+Shift+A attaches the selected text, and typing `ask` and a question in KRunner sends it. Dolphin's Actions menu attaches text files on both editions. Locking the screen or logging out stops an answer in progress. `man vigil-ask` has the details, and `bash scripts/test-vigil-ask.sh` tests it in a throwaway Fedora 44 VM, with results in `.build/vigil-ask-test/`. Its nested Plasma checks need an existing usable EGL render node for the virtual GPU (`VIGIL_TEST_RENDER_NODE`, default `/dev/dri/renderD128`); the runner makes no host graphics or permission changes.
 

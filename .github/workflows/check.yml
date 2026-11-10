@@ -1,0 +1,24 @@
+name: Source checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    container: registry.fedoraproject.org/fedora:44
+    steps:
+      - name: Install check tools
+        run: >-
+          dnf -y install git python3 python3-pyside6 python3-gobject-base dbus-daemon
+          xorriso rpm-build desktop-file-utils i3 rofi ShellCheck
+      - uses: actions/checkout@v4
+      - name: Source checks
+        env:
+          QT_QPA_PLATFORM: offscreen
+          VIGIL_ASK_REQUIRE_WINDOW: '1'
+        run: bash scripts/validate.sh

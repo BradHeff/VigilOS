@@ -81,6 +81,10 @@ class Release:
         self.iso_label(desktop)
         return f'VIGILOS-{self.version}-{desktop}-build-evidence.tar.gz'
 
+    def rpms_name(self, desktop):
+        self.iso_label(desktop)
+        return f'VIGILOS-{self.version}-{desktop}-rpms.tar'
+
     def record(self):
         return {**asdict(self), 'version': self.version}
 

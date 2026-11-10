@@ -1,4 +1,4 @@
-.TH VIGIL-ASK 1 2026-11-01 "VIGIL OS" "User Commands"
+.TH VIGIL-ASK 1 2026-11-10 "VIGIL OS" "User Commands"
 .SH NAME
 vigil-ask \- ask a quick question from the desktop
 .SH SYNOPSIS
@@ -77,6 +77,14 @@ remove the connection under Settings > Accounts > Connected desktops on VIGIL GL
 .TP
 .B krunner
 Answer \fBask\fR queries from KRunner. D-Bus starts it when KRunner needs it, and it leaves after ten idle minutes.
+.SH WINDOW
+The header shows the model and thinking effort the next question uses.
+\fBSettings\fR chooses the model (GLM-5.3 Flash or GLM-5.3), the thinking effort (Low, High or Max)
+and how long history is kept. Choosing \fBKeep no history\fR deletes the saved history at once.
+\fBTurn off VIGIL Ask\fR is there too.
+\fBHistory\fR lists recent conversations; open one to read it and ask a follow-up.
+Each code block in an answer has a \fBCopy code\fR link.
+Enter asks, Shift+Enter starts a new line and Esc closes the window.
 .SH DESKTOP
 On i3, Super+Shift+A asks through Rofi and Super+Ctrl+A opens the window with the selection attached.
 The Polybar module shows the status; click it to ask, middle-click for history and right-click to reopen the last conversation.
@@ -101,6 +109,7 @@ The window shows the account and how much of its limits is used.
 .I ~/.config/vigil-ask/config.json
 \fBenabled\fR (true), \fBhistory_days\fR (30; 0 keeps no history), \fBmodel\fR (glm-5.3-flash when null, or glm-5.3),
 \fBeffort\fR (low when null, high or max) and \fBnotice_accepted\fR.
+A model or effort VIGIL Ask does not know falls back to the default, and the window and \fBask\fR say so.
 .TP
 .I ~/.local/state/vigil-ask/history.json
 Recent questions and answers, readable only by you.

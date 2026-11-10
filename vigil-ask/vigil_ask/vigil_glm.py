@@ -12,6 +12,8 @@ PROTOCOL = 1
 DEVICE_GRANT = 'urn:ietf:params:oauth:grant-type:device_code'
 MODELS = ('glm-5.3-flash', 'glm-5.3')
 EFFORTS = ('low', 'high', 'max')
+LABELS = {'glm-5.3-flash': 'GLM-5.3 Flash', 'glm-5.3': 'GLM-5.3', 'low': 'Low', 'high': 'High', 'max': 'Max'}
+USAGE_SECONDS = 60
 LOOPBACK = ('127.0.0.1', 'localhost', '::1')
 STALL_SECONDS = 120
 RENEW_SECONDS = 60
@@ -221,12 +223,37 @@ def usage_line(data):
     return f'Used {five}% of the 5-hour limit and {week}% of the weekly limit'
 
 
-def usage(session):
+_usage = {}
+
+
+def usage(session, max_age=USAGE_SECONDS):
+    """The usage line, fetched at most once a minute per connection unless max_age is 0."""
+    key = (session['origin'], session['id'])
+    cached = _usage.get(key)
+    if cached and time.monotonic() - cached[0] < max_age:
+        return cached[1]
     try:
         status, reply = authorized('GET', '/api/usage', session)
     except (OSError, ValueError, SignedOut, http.client.HTTPException):
         return ''
-    return usage_line(reply) if status == 200 else ''
+    line = usage_line(reply) if status == 200 else ''
+    _usage[key] = (time.monotonic(), line)
+    return line
+
+
+def choice(model=None, effort=None):
+    """The model and thinking effort a question uses: the settings when VIGIL Ask knows them, else the defaults."""
+    return model if model in MODELS else MODELS[0], effort if effort in EFFORTS else EFFORTS[0]
+
+
+def unknown_settings(model=None, effort=None):
+    """A note when the settings name a model or effort this VIGIL Ask does not know, so the fallback is never silent."""
+    used = choice(model, effort)
+    names = [f'{name} {value!r}' for name, value, chosen in (('model', model, used[0]), ('thinking effort', effort, used[1]))
+             if value is not None and value != chosen]
+    if not names:
+        return ''
+    return f'Unknown {" and ".join(names)} in settings, so this uses {LABELS[used[0]]} with {LABELS[used[1]]} thinking.'
 
 
 def revoke(session, timeout=5):
@@ -279,7 +306,8 @@ class Connect:
         if status != 200:
             raise ValueError(f'VIGIL GLM could not start the sign-in ({grant.get("error") or status}).')
         if grant.get('protocol_version') != PROTOCOL:
-            raise ValueError('This version of VIGIL Ask cannot sign in to VIGIL GLM. Update VIGIL OS, then try again.')
+            raise ValueError(f'VIGIL GLM now uses sign-in protocol {grant.get("protocol_version")}, and VIGIL Ask {core.VERSION} '
+                             f'supports protocol {PROTOCOL}. Update VIGIL Ask, then try again.')
         code, uri = grant.get('user_code'), grant.get('verification_uri')
         expires, interval = grant.get('expires_in'), grant.get('interval', 5)
         page = urllib.parse.urlsplit(uri if isinstance(uri, str) else '')
@@ -424,7 +452,8 @@ class Run:
     def _ask(self, messages, model, effort, session):
         if not session:
             return {'state': 'signin', 'error': ''}
-        body = json.dumps({'model': model if model in MODELS else MODELS[0], 'thinkingEffort': effort if effort in EFFORTS else EFFORTS[0],
+        model, effort = choice(model, effort)
+        body = json.dumps({'model': model, 'thinkingEffort': effort,
                            'messages': messages, 'webSearch': False, 'imageTool': False, 'browserTool': False}).encode()
         try:
             session = fresh(session)

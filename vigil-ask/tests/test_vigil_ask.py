@@ -156,6 +156,14 @@ class Renewal(Base):
         self.assertEqual(vigil_glm.account(vigil_glm.load_session())['email'], fake_vigil.EMAIL)
         self.assertEqual(self.fake.revoked, set())
 
+    def test_usage_is_fetched_once_a_minute_unless_forced(self):
+        session = self.sign_in()
+        self.assertIn('Used 12%', vigil_glm.usage(session))
+        self.assertIn('Used 12%', vigil_glm.usage(session))
+        self.assertEqual(len(self.paths('/api/usage')), 1, 'a second look within a minute uses the cached line')
+        vigil_glm.usage(session, 0)
+        self.assertEqual(len(self.paths('/api/usage')), 2, 'after an answer the usage is fetched again')
+
     def test_a_revoked_connection_signs_out(self):
         session = self.sign_in()
         self.fake.revoked.add('desktop-1')
@@ -211,7 +219,9 @@ class Device(Base):
                              'error': 'VIGIL GLM sent a sign-in code VIGIL Ask does not understand.'}))
         with patch.object(vigil_glm, 'call', lambda *a, **k: (200, {'protocol_version': 2})):
             flow = vigil_glm.Connect()
-            self.assertIn('Update VIGIL OS', flow.events.get(timeout=5)[1]['error'])
+            error = flow.events.get(timeout=5)[1]['error']
+            self.assertIn('protocol 2', error)
+            self.assertIn(f'VIGIL Ask {core.VERSION} supports protocol 1. Update VIGIL Ask', error)
 
 
 class Request(Base):
@@ -246,6 +256,12 @@ class Request(Base):
         self.finish(vigil_glm.Run(vigil_glm.conversation([], 'q'), 'other-model', 'extreme'))
         bodies = [c['body'] for c in self.calls()]
         self.assertEqual([(b['model'], b['thinkingEffort']) for b in bodies], [('glm-5.3', 'high'), ('glm-5.3-flash', 'low')])
+        self.assertEqual(vigil_glm.unknown_settings('glm-5.3', 'max'), '')
+        self.assertEqual(vigil_glm.unknown_settings(None, None), '')
+        note = vigil_glm.unknown_settings('other-model', 'extreme')
+        self.assertIn("model 'other-model'", note)
+        self.assertIn("thinking effort 'extreme'", note)
+        self.assertIn('GLM-5.3 Flash with Low thinking', note)
 
 
 class Streaming(Base):
@@ -466,6 +482,14 @@ class Terminal(Base):
         self.assertEqual([m['content'].strip() for m in self.calls()[1]['body']['messages'][2:]], [MARKER, ANSWER, 'and then?'])
         self.assertEqual(len(core.find_history(entry['id'])['turns']), 2)
         self.assertEqual(self.launch('ask', '--resume', 'unknown', 'q').returncode, 2)
+
+    def test_unknown_settings_are_named_in_the_terminal(self):
+        self.ready()
+        core.save_config(model='glm-9')
+        result = self.launch('ask', MARKER)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Unknown model 'glm-9' in settings", result.stderr)
+        self.assertEqual(self.calls()[0]['body']['model'], 'glm-5.3-flash')
 
     def test_notice_comes_first(self):
         self.sign_in()
@@ -718,7 +742,7 @@ class WindowSmoke(Base):
         from shiboken6 import isValid
         started, release, finished = threading.Event(), threading.Event(), threading.Event()
 
-        def delayed_usage(session):
+        def delayed_usage(session, *args):
             started.set()
             release.wait(10)
             finished.set()
@@ -737,6 +761,56 @@ class WindowSmoke(Base):
             finally:
                 release.set()
                 self.until(finished.is_set)
+
+    def test_code_copy_history_and_settings(self):
+        from PySide6.QtCore import QUrl
+        self.ready()
+        w = self.open()
+        self.assertIn('GLM-5.3 Flash · Low thinking', w.model_label.text())
+        self.assertIn('Shift+Enter', w.prompt.placeholderText())
+        self.until(lambda: 'Used 12%' in w.account.text())
+        before = len(self.paths('/api/usage'))
+        self.fake.mode = 'code'
+        w.apply({'action': 'open', 'prompt': MARKER, 'submit': True})
+        self.until(lambda: w.run is None and w.turns and w.turns[-1]['state'] == 'done')
+        self.assertEqual(w.code_blocks, ['print("hi")', 'ls -l'])
+        self.assertIn('Copy code', w.answer.toPlainText())
+        w.open_link(QUrl('vigil-copy:1'))
+        self.assertEqual(self.app.clipboard().text(), 'ls -l')
+        w.open_link(QUrl('vigil-copy:9'))
+        self.assertEqual(self.app.clipboard().text(), 'ls -l', 'an unknown block copies nothing')
+        self.until(lambda: len(self.paths('/api/usage')) == before + 1, timeout=10)
+        time.sleep(0.5)
+        self.assertEqual(len(self.paths('/api/usage')), before + 1, 'asking reused the cached usage; the answer refreshed it once')
+        entry = core.load_history()[0]['id']
+        w.new_conversation()
+        w.open_history()
+        self.assertEqual(w.dialog.chosen(), entry)
+        w.dialog.accept()
+        self.assertEqual((w.entry_id, [t['q'] for t in w.turns]), (entry, [MARKER]))
+        w.open_settings()
+        dialog = w.dialog
+        dialog.model.setCurrentIndex(dialog.model.findData('glm-5.3'))
+        dialog.effort.setCurrentIndex(dialog.effort.findData('high'))
+        dialog.days.setCurrentIndex(dialog.days.findData(0))
+        dialog.save()
+        self.assertEqual({k: core.load_config()[k] for k in ('model', 'effort', 'history_days')},
+                         {'model': 'glm-5.3', 'effort': 'high', 'history_days': 0})
+        self.assertFalse(core.history_path().exists(), 'keeping no history deletes what was kept')
+        self.assertIn('GLM-5.3 · High thinking', w.model_label.text())
+        self.fake.mode = 'ok'
+        w.prompt.setPlainText('follow-up')
+        w.send()
+        self.until(lambda: w.run is None)
+        self.assertEqual((self.calls()[-1]['body']['model'], self.calls()[-1]['body']['thinkingEffort']), ('glm-5.3', 'high'))
+        core.save_config(model='glm-9')
+        w.check_setup()
+        self.assertIn('check Settings', w.model_label.text())
+        self.assertIn("Unknown model 'glm-9'", w.model_label.toolTip())
+        w.open_settings()
+        w.dialog.turn_off()
+        self.assertEqual(w.state, 'off')
+        w.close()
 
     def test_disable_is_rechecked_before_sending(self):
         self.ready()
